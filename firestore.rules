@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function patientDoc(patientId) {
+      return get(/databases/$(database)/documents/patients/$(patientId));
+    }
+
+    function ownsPatient(patientId) {
+      return signedIn()
+        && patientId is string
+        && patientId.size() > 0
+        && patientDoc(patientId).data.authUid == request.auth.uid;
+    }
+
+    function isOwnPatientData() {
+      return signedIn()
+        && request.resource.data.keys().hasAll(['authUid'])
+        && request.resource.data.authUid is string
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.authUid.size() > 0;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /profiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && !('avatarDataUrl' in request.resource.data)
+        && !('photoDataUrl' in request.resource.data);
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && !('avatarDataUrl' in request.resource.data)
+        && !('photoDataUrl' in request.resource.data);
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && !('imageDataUrl' in request.resource.data)
+        && (!('image' in request.resource.data)
+            || request.resource.data.image == null
+            || (request.resource.data.image is string
+                && !request.resource.data.image.matches('data:.*')));
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /patients/{patientId} {
+      // Allow get of missing docs so clients can check before create (help → draft).
+      allow get: if isAdmin()
+        || (signedIn() && !exists(/databases/$(database)/documents/patients/$(patientId)))
+        || (signedIn() && resource.data.authUid == request.auth.uid);
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.authUid == request.auth.uid);
+      // Customers may create/update only their own linked patient record (help → draft).
+      allow create: if isAdmin() || isOwnPatientData();
+      allow update: if isAdmin()
+        || (signedIn()
+            && resource.data.authUid == request.auth.uid
+            && request.resource.data.authUid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /screenings/{screeningId} {
+      // Allow get of missing docs so create paths can probe existence safely.
+      allow get: if isAdmin()
+        || (signedIn() && !exists(/databases/$(database)/documents/screenings/$(screeningId)))
+        || (signedIn() && ownsPatient(resource.data.patientId));
+      // Own-patient list (results / notifications). Client filters shared vs draft.
+      allow list: if isAdmin()
+        || (signedIn() && ownsPatient(resource.data.patientId));
+      // Customers may create a draft linked to their patient (from Get help).
+      allow create: if isAdmin()
+        || (signedIn()
+            && request.resource.data.status == 'draft'
+            && ownsPatient(request.resource.data.patientId));
+      allow update: if isAdmin()
+        || (signedIn()
+            && resource.data.status == 'draft'
+            && request.resource.data.status == 'draft'
+            && ownsPatient(resource.data.patientId)
+            && ownsPatient(request.resource.data.patientId));
+      allow delete: if isAdmin();
+    }
+
+    match /intakes/{intakeId} {
+      allow get: if isAdmin()
+        || (signedIn() && !exists(/databases/$(database)/documents/intakes/$(intakeId)))
+        || (signedIn() && resource.data.authUid == request.auth.uid);
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.authUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      // Owner may update while open (pending / in_review) if status stays open.
+      allow update: if isAdmin()
+        || (isOwner(resource.data.authUid)
+            && (resource.data.status == 'pending' || resource.data.status == 'in_review')
+            && request.resource.data.authUid == resource.data.authUid
+            && (request.resource.data.status == 'pending'
+                || request.resource.data.status == 'in_review'));
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.authUid == request.auth.uid);
+    }
+
+    match /knowledgeBank/{caseId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

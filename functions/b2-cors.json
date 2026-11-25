@@ -1,0 +1,29 @@
+[
+  {
+    "corsRuleName": "greenhealthBrowserUploads",
+    "allowedOrigins": [
+      "https://greenhealthproducts.web.app",
+      "https://greenhealthproducts.firebaseapp.com",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000"
+    ],
+    "allowedOperations": [
+      "s3_put",
+      "s3_get",
+      "s3_head",
+      "s3_post",
+      "s3_delete",
+      "b2_download_file_by_id",
+      "b2_download_file_by_name"
+    ],
+    "allowedHeaders": ["*"],
+    "exposeHeaders": [
+      "ETag",
+      "x-amz-request-id",
+      "x-bz-content-sha1",
+      "x-bz-file-id",
+      "x-bz-file-name"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

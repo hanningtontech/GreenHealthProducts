@@ -1,0 +1,178 @@
+ILLUSTRATIVE WELLNESS SCREENING REPORT — PERSON Y
+====================================================
+
+Report type: Fictional sample for training and website planning
+Report date: 21 November 2026
+Report time: 14:35
+Operator: Wellness screening operator
+Device: Quantum resonance magnetic analyzer — sixth-generation style
+
+1. PERSON Y PROFILE
+--------------------
+
+Name: Person Y
+Sex: Male
+Age: 47 years
+Height: 178 cm
+Weight: 84 kg
+Body mass index: Approximately 26.5 kg/m²
+Lifestyle note: Mostly seated work, occasional exercise
+Main concerns entered by the person:
+- Frequent tiredness in the afternoon
+- Occasional stomach heaviness after meals
+- Poor sleep during busy weeks
+- Mild stiffness in the lower back and knees
+- Wants general nutrition and wellness guidance
+
+2. ILLUSTRATIVE SCREENING SUMMARY
+----------------------------------
+
+The sample output suggests that Person Y may have digestive discomfort, low energy, inconsistent sleep, and general joint or movement-related wellness concerns. The software also shows a few nutrition-related flags, particularly around vitamin D, magnesium, and general antioxidant support.
+
+The circulation profile is mostly within the displayed software range, although one cholesterol-related indicator is flagged for attention. The respiratory profile is generally within the displayed range. The report does not suggest an urgent issue in this fictional example.
+
+3. SAMPLE SOFTWARE FLAGS
+------------------------
+
+Profile group: Cardiovascular and circulation
+Result: Mostly within the displayed range
+Flagged item: Cholesterol-related indicator
+Illustrative value: 71.204
+Suggested discussion: Review diet, activity, family history, and consider a proper lipid test if appropriate.
+
+Profile group: Digestive wellness
+Result: Needs attention
+Flagged items: Gastric function and intestinal movement
+Illustrative values: 46 and 43
+Suggested discussion: Review meal timing, portion size, fibre, water intake, and actual digestive symptoms.
+
+Profile group: Liver and urinary wellness
+Result: Within the displayed range with one borderline flag
+Flagged item: Liver metabolic activity
+Illustrative value: 44
+Suggested discussion: Do not interpret this as liver disease. Consider proper clinical tests if symptoms or risk factors exist.
+
+Profile group: Respiratory wellness
+Result: Generally within the displayed range
+Illustrative value: 67
+Suggested discussion: Continue normal activity and discuss any persistent cough, wheezing, or breathlessness with a health professional.
+
+Profile group: Nutrition and minerals
+Result: Needs attention
+Flagged items: Vitamin D, magnesium, and iron-related profiles
+Illustrative values: 38, 45, and 47
+Suggested discussion: Improve food quality and consider validated tests before taking high-dose supplements.
+
+Profile group: Bone and joint wellness
+Result: Needs attention
+Flagged items: Bone density tendency and joint comfort
+Illustrative values: 48 and 42
+Suggested discussion: Encourage safe movement, stretching, weight management, and clinical review if pain persists.
+
+Profile group: Energy and sleep
+Result: Needs attention
+Flagged items: Energy profile and sleep recovery
+Illustrative values: 41 and 39
+Suggested discussion: Review sleep schedule, stress, caffeine, workload, and other causes of fatigue.
+
+4. ILLUSTRATIVE CONCLUSION
+---------------------------
+
+Person Y appears to be experiencing a combination of digestive discomfort, afternoon tiredness, inconsistent sleep, and mild joint or movement-related wellness concerns. The screening also suggests possible nutritional gaps involving vitamin D and magnesium, together with a need to improve daily activity and meal quality.
+
+The main areas for attention are:
+
+- Digestive comfort after meals
+- Afternoon fatigue and reduced energy
+- Poor sleep during stressful periods
+- Possible low vitamin D and magnesium intake
+- Mild lower-back and knee stiffness
+- Diet and activity factors that may affect the cholesterol-related indicator
+
+Person Y would benefit from a more regular sleep routine, balanced meals, adequate water, more fibre, regular low-impact activity, stretching, and gradual improvement in physical fitness.
+
+5. ILLUSTRATIVE GREENWORLD PRODUCT OPTIONS
+--------------------------------------------
+
+Concern: General nutritional support
+Product option: W41 Super Nutrition or W15 Multi-vitamin Tablet for Adults
+Suggested role: General nutritional support where the current package label is suitable.
+
+Concern: Vitamin D and bone-support flag
+Product option: W59 Vitamin D3 Capsule or W16 Calcium Tablet for Adults
+Suggested role: Nutritional support only after checking the current label and considering the person’s actual needs.
+
+Concern: Digestive discomfort
+Product option: W51 Fresh Drink Clear
+Suggested role: General digestive-wellness beverage option.
+
+Alternative digestive option: W28 Intestine Cleansing Tea
+Suggested role: General bowel-wellness option; use the package directions and avoid presenting it as a treatment for disease.
+
+Concern: Low energy and poor dietary protein
+Product option: W14 Protein Powder
+Suggested role: Additional protein where the person’s normal diet does not provide enough protein.
+
+Concern: General antioxidant and nutrition support
+Product option: W39 Vitamin C Tablet
+Suggested role: Vitamin C supplementation as described on the current package label.
+
+Concern: Joint and movement wellness
+Product option: W37 Joint Health Plus Capsule
+Suggested role: General joint-wellness support alongside movement and stretching.
+
+Concern: General omega-3 nutrition
+Product option: W19 Deep Sea Fish Oil Softgel
+Suggested role: Omega-3 nutritional support after checking medicine use, allergies, and the current package warnings.
+
+6. SUGGESTED STARTING PLAN
+--------------------------
+
+First option:
+- W41 Super Nutrition for general nutrition support
+- Improve meals, water intake, sleep, and daily movement
+
+Second option if digestive discomfort is the main complaint:
+- W51 Fresh Drink Clear or W28 Intestine Cleansing Tea
+- Keep a simple food-and-symptom record
+- Review the person’s response before adding another product
+
+Third option if the person has a low-protein diet:
+- W14 Protein Powder
+- Use it as an addition to meals, not as a replacement for a balanced diet
+
+Optional later support:
+- W19 Deep Sea Fish Oil Softgel for general omega-3 nutrition
+- W37 Joint Health Plus Capsule for general joint wellness
+
+Products should be introduced one at a time so that the person can observe tolerance and response. Follow the current package label and check for medicine interactions, allergies, pregnancy, chronic illness, or other relevant precautions.
+
+7. EXAMPLE CUSTOMER EXPLANATION
+--------------------------------
+
+“Your screening suggests that your main wellness areas to work on are digestion, sleep, energy, nutrition, and regular movement. The best starting point is to improve meals, drink enough water, sleep more consistently, and add gentle daily activity. A general nutrition product such as Super Nutrition may be considered. If stomach discomfort is your main concern, a digestive-wellness product may be considered. If your diet is low in protein, Protein Powder may help add protein to meals. Start with one product at a time and follow the current package instructions.”
+
+8. KISWAHILI CUSTOMER EXPLANATION
+----------------------------------
+
+“Uchunguzi huu unaonyesha kuwa maeneo muhimu ya kuzingatia ni mmeng’enyo wa chakula, usingizi, nguvu za mwili, lishe na kufanya mazoezi kwa kawaida. Mwanzo mzuri ni kuboresha chakula, kunywa maji ya kutosha, kulala kwa ratiba na kufanya mazoezi mepesi kila siku. Unaweza kuzingatia bidhaa ya lishe kwa ujumla kama Super Nutrition. Ikiwa tatizo kuu ni usumbufu wa tumbo, bidhaa ya kusaidia mmeng’enyo inaweza kuzingatiwa. Ikiwa chakula chako kina protini kidogo, Protein Powder inaweza kuongeza protini kwenye milo. Anza bidhaa moja kwa wakati na fuata maelekezo ya lebo ya sasa.”
+
+9. ADMIN NOTES FOR THE WEBSITE PATIENT RECORD
+-----------------------------------------------
+
+Patient record status: Fictional training record
+Raw report file: To be uploaded by administrator
+Simple conclusion: Digestive discomfort, low energy, inconsistent sleep, possible nutrition gaps, and mild joint stiffness.
+Recommended category: General wellness support
+Products discussed: W41, W15, W51, W28, W14, W39, W37, W19
+Follow-up fields:
+- Actual symptoms confirmed by the person
+- Current medicines
+- Allergies
+- Existing diagnoses
+- Pregnancy status where relevant
+- Products already being used
+- Clinician referral required: If symptoms persist, worsen, or appear serious
+- Admin approval: Required before this example is used as reusable learning material
+
+The report should be shown to the customer in simple language. The raw analyzer output and the simplified conclusion should be stored as separate sections in the patient record.

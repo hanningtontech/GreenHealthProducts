@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"GreenHealthProducts"},{"path":"/shop","title":"Shop wellness products"},{"path":"/product/:id","title":"Product details"},{"path":"/about","title":"About GreenHealthProducts"},{"path":"/admin","title":"Owner product workspace"},{"path":"/404","title":"Page not found"}]}

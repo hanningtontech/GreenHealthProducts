@@ -1,0 +1,873 @@
+{
+  "generatedAt": "2026-11-24T16:04:23.486Z",
+  "summary": {
+    "researched": 71,
+    "verified": 9,
+    "needsReview": 59,
+    "unsuitable": 3,
+    "awaitingLabelEvidence": [
+      "W01",
+      "W02",
+      "W03",
+      "W04",
+      "W05",
+      "W06",
+      "W07",
+      "W08",
+      "W09",
+      "W10",
+      "W11",
+      "W12",
+      "W13",
+      "W16",
+      "W17",
+      "W18",
+      "W19",
+      "W20",
+      "W21",
+      "W22",
+      "W23",
+      "W24",
+      "W25",
+      "W26",
+      "W27",
+      "W29",
+      "W30",
+      "W31",
+      "W32",
+      "W33",
+      "W34",
+      "W35",
+      "W36",
+      "W40",
+      "W42",
+      "W43",
+      "W44",
+      "W45",
+      "W46",
+      "W50",
+      "W52",
+      "W53",
+      "W54",
+      "W55",
+      "W56",
+      "W57",
+      "W58",
+      "W60",
+      "W61",
+      "W62",
+      "W63",
+      "W64",
+      "W65",
+      "W66",
+      "W67",
+      "W68",
+      "W69",
+      "W70",
+      "W71"
+    ]
+  },
+  "products": [
+    {
+      "code": "W01",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W01 Cordyceps Plus Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W02",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W02 Spirulina Plus Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W03",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W03 Propolis Plus Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W04",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W04 Ganoderma Plus Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W05",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W05 Cardio Power Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W06",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W06 Soy Power Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W07",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W07 A-Power Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W08",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W08 VigPower Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W09",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W09 Ginseng RHs Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W10",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W10 Pro-slim Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W11",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W11 Kuding Plus Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W12",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "stress-beverage",
+        "ganoderma-coffee"
+      ],
+      "reasonEn": "Optional wellness coffee beverage — not a sleep or anxiety treatment; check the label.",
+      "notes": "Do not default for stress-related sleep trouble.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog label / intended beverage use"
+    },
+    {
+      "code": "W13",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W13 Lipid Care Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W14",
+      "reviewStatus": "verified",
+      "needs": [
+        "protein",
+        "energy-nutrition",
+        "dietary-protein-gap"
+      ],
+      "reasonEn": "Additional dietary protein when meals are light — follow the package; not for bleeding or breathlessness.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: protein powder"
+    },
+    {
+      "code": "W15",
+      "reviewStatus": "verified",
+      "needs": [
+        "multivitamin",
+        "nutrition"
+      ],
+      "reasonEn": "Adult multivitamin option for general nutritional support — follow the label.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use"
+    },
+    {
+      "code": "W16",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W16 Calcium Tablet (For Adults) — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W17",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W17 Zinc Tablet (For Adults) — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W18",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W18 Lecithin Softgel — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W19",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "omega-3",
+        "circulation-wellness"
+      ],
+      "reasonEn": "Omega-3 nutritional softgel when circulation/nutrition fit is clear — check EPA/DHA on the pack.",
+      "notes": "Do not default for stress/sleep.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: fish oil"
+    },
+    {
+      "code": "W20",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W20 Meal Cellulose tablets — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W21",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W21 Garlic Oil capsules — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W22",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W22 Eye Care Softgel — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W23",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W23 Chitosan Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W24",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W24 Aloe Vera Plus Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W25",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W25 Compound Marrow Powder — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W26",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "dizziness",
+        "ginkgo"
+      ],
+      "reasonEn": "Discuss only if spinning-type dizziness fits; confirm extract on pack and ask a pharmacist with blood thinners.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: ginkgo"
+    },
+    {
+      "code": "W27",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W27 Pine Pollen Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W28",
+      "reviewStatus": "verified",
+      "needs": [
+        "digestive-tea",
+        "intestinal-comfort"
+      ],
+      "reasonEn": "Digestive wellness tea option — not a treatment for reflux disease; follow the label.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: intestine cleansing tea"
+    },
+    {
+      "code": "W29",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W29 Balsam Pear Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W30",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W30 B-Carotene & Lycopene Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W31",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W31 Livergen Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W32",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W32 Royal Jelly Softgel — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W33",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W33 L-Arginine Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W34",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W34 Parashield Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W35",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "topical"
+      ],
+      "reasonEn": "W35 Magic Detoxin Pad — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W36",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W36 Slimming Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W37",
+      "reviewStatus": "verified",
+      "needs": [
+        "joint",
+        "movement",
+        "wrist",
+        "knee"
+      ],
+      "reasonEn": "General joint wellness capsule when movement discomfort is the main ask — follow the label.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: joint health"
+    },
+    {
+      "code": "W38",
+      "reviewStatus": "verified",
+      "needs": [
+        "migraine-like",
+        "coq10",
+        "headache-light"
+      ],
+      "reasonEn": "Discuss for recurrent migraine-like headaches with light sensitivity; check CoQ10 amount on the package.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: CoQ10"
+    },
+    {
+      "code": "W39",
+      "reviewStatus": "verified",
+      "needs": [
+        "vitamin-c",
+        "immune-nutrition"
+      ],
+      "reasonEn": "Vitamin C tablet for general antioxidant/nutrition support — follow the label.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use"
+    },
+    {
+      "code": "W40",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W40 Vitamin E Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W41",
+      "reviewStatus": "verified",
+      "needs": [
+        "nutrition",
+        "super-nutrition",
+        "vitamin-mineral"
+      ],
+      "reasonEn": "Broad nutrient support option when diet gaps are the concern — follow the label.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: super nutrition"
+    },
+    {
+      "code": "W42",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W42 Glucoblock Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W43",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W43 ProstaSure Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W44",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W44 Kidney Tonifying Capsule (Men) — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W45",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W45 Kidney Tonifying Capsule (Women) — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W46",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W46 Blue Berry Juice High VC — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W47",
+      "reviewStatus": "unsuitable",
+      "needs": [
+        "non-human"
+      ],
+      "reasonEn": "Not for personal wellness recommendation.",
+      "notes": "Fertilizer / non-human SKU",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog category"
+    },
+    {
+      "code": "W48",
+      "reviewStatus": "unsuitable",
+      "needs": [
+        "non-human"
+      ],
+      "reasonEn": "Not for personal wellness recommendation.",
+      "notes": "Fertilizer / non-human SKU",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog category"
+    },
+    {
+      "code": "W49",
+      "reviewStatus": "unsuitable",
+      "needs": [
+        "non-human"
+      ],
+      "reasonEn": "Not for personal wellness recommendation.",
+      "notes": "Fertilizer / non-human SKU",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog category"
+    },
+    {
+      "code": "W50",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "oral-care"
+      ],
+      "reasonEn": "W50 Tooth Paste — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W51",
+      "reviewStatus": "verified",
+      "needs": [
+        "digestive-drink",
+        "diarrhea-comfort",
+        "stomach"
+      ],
+      "reasonEn": "Digestive wellness drink for tummy/bowel comfort topics — not a reflux or joint product.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: Fresh Drink Clear"
+    },
+    {
+      "code": "W52",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "hygiene"
+      ],
+      "reasonEn": "W52 Olive Soap — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W53",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W53 Breast Care Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W54",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W54 Uterus Cleansing Pill — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W55",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W55 Jinpure Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W56",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W56 NMN Longevity Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W57",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W57 Jinpure Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W58",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W58 SE Tablet (For Adults) — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W59",
+      "reviewStatus": "verified",
+      "needs": [
+        "vitamin-d",
+        "bone"
+      ],
+      "reasonEn": "Vitamin D3 capsule when bone/vitamin D support is the ask — follow the label.",
+      "notes": "",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use"
+    },
+    {
+      "code": "W60",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W60 Calcium Powder for Children — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W61",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W61 Calcium Powder for Adult — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W62",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W62 Calcium with Blood Sugar Support — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W63",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "topical"
+      ],
+      "reasonEn": "W63 Bone Care Plaster — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W64",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "topical"
+      ],
+      "reasonEn": "W64 Women Care Gel — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W65",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W65 Clear Lung Tea — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W66",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W66 Trifolium Pratense Coffee — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Identity/label evidence incomplete — admin review before auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W67",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "beverage"
+      ],
+      "reasonEn": "W67 Ashwagandha Coffee — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W68",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W68 Vitamin B9 Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W69",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W69 Blueberry Probiotics — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W70",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "supplement"
+      ],
+      "reasonEn": "W70 Ovary Nutrition Capsule — wellness catalog option; confirm fit on the current package label.",
+      "notes": "Present in live catalog; awaiting explicit bank option + label confirmation for auto-recommend.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "researchedCatalog evidence_status / match_status"
+    },
+    {
+      "code": "W71",
+      "reviewStatus": "needs_review",
+      "needs": [
+        "gastric",
+        "reflux",
+        "heartburn"
+      ],
+      "reasonEn": "Gastric comfort tablet only when heartburn/reflux-style discomfort is the topic — follow the label.",
+      "notes": "Must not inherit onto diarrhea bank matches.",
+      "reviewedAt": "2026-11-24",
+      "sourceHint": "catalog intended use: gastric health"
+    }
+  ]
+}
