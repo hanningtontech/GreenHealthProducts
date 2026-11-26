@@ -20,9 +20,28 @@ import {
   assertGenerateInput,
   generateWellnessReplyCore,
 } from "./generateWellnessReply";
+import {
+  assertConfirmDiamondInput,
+  confirmDiamondReplyCore,
+} from "./confirmDiamondReply";
+import {
+  assertAssistStoreSearchInput,
+  assistStoreSearchCore,
+} from "./assistStoreSearch";
+import {
+  RATE_PRESETS,
+  assertRateLimit,
+  rateLimitIdentity,
+} from "./rateLimit";
 
 initializeApp();
 const db = getFirestore();
+
+function rawReq(request: {
+  rawRequest?: { ip?: string; headers?: { [key: string]: string | string[] | undefined } };
+}) {
+  return request.rawRequest;
+}
 
 const ALLOWED_PURPOSES = new Set(["profile", "product", "screening", "report"]);
 
@@ -111,6 +130,15 @@ function resolveUploadKey(
 
 export const matchContentBankFn = onCall(async (request) => {
   await assertAdmin(request.auth?.uid);
+  const who = rateLimitIdentity(request.auth?.uid, rawReq(request));
+  await assertRateLimit(db, {
+    key: `callable:${who}`,
+    ...RATE_PRESETS.callableUser,
+  });
+  await assertRateLimit(db, {
+    key: `matchBank:${who}`,
+    ...RATE_PRESETS.matchBankUser,
+  });
   const text = String(request.data?.text || "").toLowerCase();
   if (!text) throw new HttpsError("invalid-argument", "text required");
   const snap = await db.collection("knowledgeBank").get();
@@ -120,7 +148,10 @@ export const matchContentBankFn = onCall(async (request) => {
       if (data.active === false) return null;
       if (data.reviewStatus === "quarantined" || data.reviewStatus === "needs_review") return null;
       if (data.qualityFlag === "red") return null;
-      const approved = data.reviewStatus === "approved" || data.qualityFlag === "green" || !data.reviewStatus;
+      const approved = data.reviewStatus === "approved"
+        || data.qualityFlag === "diamond"
+        || data.qualityFlag === "green"
+        || !data.reviewStatus;
       if (!approved && data.qualityFlag === "yellow") return null;
       const triggers = [
         ...(data.triggersEn || []),
@@ -147,9 +178,13 @@ export const matchContentBankFn = onCall(async (request) => {
  * Patients never call this; bank answers first in the client orchestrator.
  */
 export const generateWellnessReply = onCall(
-  { cors: true, maxInstances: 10, timeoutSeconds: 60 },
+  { cors: true, maxInstances: 5, timeoutSeconds: 60 },
   async (request) => {
     await assertAdmin(request.auth?.uid);
+    const who = rateLimitIdentity(request.auth?.uid, rawReq(request));
+    await assertRateLimit(db, { key: `ai:global`, ...RATE_PRESETS.aiGlobal });
+    await assertRateLimit(db, { key: `ai:admin:${who}`, ...RATE_PRESETS.aiAdminUser });
+    await assertRateLimit(db, { key: `callable:${who}`, ...RATE_PRESETS.callableUser });
     const input = assertGenerateInput(request.data);
     const result = await generateWellnessReplyCore(input);
     console.info("generateWellnessReply", {
@@ -164,10 +199,60 @@ export const generateWellnessReply = onCall(
   },
 );
 
+/**
+ * Signed-in patient (or admin): confirm a diamond bank match and personalize reply text.
+ * Used for automatic My-results sharing without admin intervention.
+ */
+export const confirmDiamondReply = onCall(
+  { cors: true, maxInstances: 8, timeoutSeconds: 60 },
+  async (request) => {
+    await assertSignedIn(request.auth?.uid);
+    const who = rateLimitIdentity(request.auth?.uid, rawReq(request));
+    await assertRateLimit(db, { key: `ai:global`, ...RATE_PRESETS.aiGlobal });
+    await assertRateLimit(db, { key: `ai:diamond:${who}`, ...RATE_PRESETS.aiDiamondUser });
+    await assertRateLimit(db, { key: `callable:${who}`, ...RATE_PRESETS.callableUser });
+    const input = assertConfirmDiamondInput(request.data);
+    const result = await confirmDiamondReplyCore(input);
+    console.info("confirmDiamondReply", {
+      ok: result.ok,
+      source: result.source,
+      language: input.language,
+      candidateId: input.candidate.id,
+    });
+    return result;
+  },
+);
+
+/**
+ * Store search assist: optional auth. Catalog-only product codes; wellness drafts need client confirm.
+ */
+export const assistStoreSearch = onCall(
+  { cors: true, maxInstances: 5, timeoutSeconds: 45 },
+  async (request) => {
+    const who = rateLimitIdentity(request.auth?.uid, rawReq(request));
+    await assertRateLimit(db, { key: `callable:${who}`, ...RATE_PRESETS.callableUser });
+    await assertRateLimit(db, { key: `ai:global`, ...RATE_PRESETS.aiGlobal });
+    await assertRateLimit(db, { key: `ai:assist:${who}`, ...RATE_PRESETS.aiAssistUser });
+    const input = assertAssistStoreSearchInput(request.data);
+    const result = await assistStoreSearchCore(input);
+    console.info("assistStoreSearch", {
+      mode: result.mode,
+      source: result.source,
+      needsConfirm: result.needsConfirm,
+      productCount: result.productCodes.length,
+      language: input.language,
+    });
+    return { ok: true, ...result };
+  },
+);
+
 /** Presign a Backblaze B2 PUT. Client uploads directly; returns public HTTPS URL. */
-export const createMediaUploadUrl = onCall({ cors: true }, async (request) => {
+export const createMediaUploadUrl = onCall({ cors: true, maxInstances: 10 }, async (request) => {
   const uid = request.auth?.uid;
   await assertSignedIn(uid);
+  const who = rateLimitIdentity(uid, rawReq(request));
+  await assertRateLimit(db, { key: `callable:${who}`, ...RATE_PRESETS.callableUser });
+  await assertRateLimit(db, { key: `upload:${who}`, ...RATE_PRESETS.uploadUser });
 
   const cfg = readB2Config();
   if (!cfg) {
@@ -230,8 +315,11 @@ export const createMediaUploadUrl = onCall({ cors: true }, async (request) => {
  * Translate English wellness copy → Kiswahili for bank replies / report summaries.
  * Uses google-translate-api-x server-side (avoids browser CORS limits).
  */
-export const translateToSwahili = onCall({ cors: true, maxInstances: 10 }, async (request) => {
+export const translateToSwahili = onCall({ cors: true, maxInstances: 5 }, async (request) => {
   await assertSignedIn(request.auth?.uid);
+  const who = rateLimitIdentity(request.auth?.uid, rawReq(request));
+  await assertRateLimit(db, { key: `callable:${who}`, ...RATE_PRESETS.callableUser });
+  await assertRateLimit(db, { key: `translate:${who}`, ...RATE_PRESETS.translateUser });
   const text = String(request.data?.text || "").trim();
   if (!text) throw new HttpsError("invalid-argument", "text is required");
   if (text.length > 12000) throw new HttpsError("invalid-argument", "text is too long (max 12000)");

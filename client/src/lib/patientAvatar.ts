@@ -1,4 +1,4 @@
-/** Initials avatar data-URL for reports (no uploaded photos until media server). */
+/** Initials + optional profile-photo data URLs for PDF embedding. */
 
 const PALETTE = [
   "#1d4d3a",
@@ -43,4 +43,43 @@ export function buildAvatarDataUrl(name: string, size = 256): string {
   ctx.textBaseline = "middle";
   ctx.fillText(initialsFromName(name || "Patient"), size / 2, size / 2 + size * 0.02);
   return canvas.toDataURL("image/png");
+}
+
+/**
+ * Load a remote profile photo as a PNG/JPEG data URL for jsPDF.
+ * Falls back to initials avatar when the photo cannot be fetched.
+ */
+export async function resolveAvatarDataUrl(
+  name: string,
+  photoUrl?: string | null,
+  size = 256,
+): Promise<string> {
+  const fallback = buildAvatarDataUrl(name, size);
+  const src = String(photoUrl || "").trim();
+  if (!src || !/^https?:\/\//i.test(src)) return fallback;
+  if (typeof document === "undefined") return fallback;
+
+  try {
+    const res = await fetch(src, { mode: "cors" });
+    if (!res.ok) return fallback;
+    const blob = await res.blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return fallback;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    const scale = Math.max(size / bitmap.width, size / bitmap.height);
+    const w = bitmap.width * scale;
+    const h = bitmap.height * scale;
+    ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
+    bitmap.close();
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } catch {
+    return fallback;
+  }
 }

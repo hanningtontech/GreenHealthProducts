@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, CloudUpload, Download, FlaskConical, List, Loader2, Plus, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { BookOpen, CloudUpload, Download, FlaskConical, List, Plus, RefreshCw, Upload } from "lucide-react";
 import { toast } from "sonner";
+import ButtonBusyMark from "@/components/ButtonBusyMark";
+import GhpAssistLabel from "@/components/GhpAssistLabel";
+import ListPager from "@/components/ListPager";
+import { PAGE_SIZE_DEFAULT, pageCount, slicePage } from "@/lib/listPaging";
 import { formatBankProductOptionLine, resolveBankProducts } from "@/lib/bankProducts";
 import {
   approveBankCase,
@@ -29,7 +33,7 @@ function productOptionLabels(recs: ScreeningRecommendation[]): string[] {
   ];
 }
 
-type QualityFlag = "green" | "yellow" | "red";
+type QualityFlag = "diamond" | "green" | "yellow" | "red";
 
 const emptyBankCase = (): KnowledgeCase => ({
   id: `bank-${Date.now()}`,
@@ -61,6 +65,8 @@ const SAMPLE_QUESTIONS = [
 ];
 
 type Panel = "entries" | "test";
+type BankPageSize = 10 | 20;
+const BANK_PAGE_SIZES: BankPageSize[] = [10, 20];
 
 export default function AdminContentBank() {
   const savedUi = useMemo(() => loadAdminBankUi(), []);
@@ -69,8 +75,13 @@ export default function AdminContentBank() {
   const [browseOpen, setBrowseOpen] = useState(() => Boolean(savedUi.browseOpen));
   const [panel, setPanel] = useState<Panel>(() => savedUi.panel || "entries");
   const [busy, setBusy] = useState("");
+  const [busyKind, setBusyKind] = useState<"" | "test" | "ghp" | "approve" | "other">("");
   const [note, setNote] = useState("");
   const [query, setQuery] = useState(() => savedUi.query || "");
+  const [entriesPage, setEntriesPage] = useState(1);
+  const [entriesPageSize, setEntriesPageSize] = useState<BankPageSize>(PAGE_SIZE_DEFAULT);
+  const [browsePage, setBrowsePage] = useState(1);
+  const [browsePageSize, setBrowsePageSize] = useState<BankPageSize>(PAGE_SIZE_DEFAULT);
   const [testQuestion, setTestQuestion] = useState(SAMPLE_QUESTIONS[0]);
   const [testReply, setTestReply] = useState("");
   const [testReplySw, setTestReplySw] = useState("");
@@ -88,11 +99,23 @@ export default function AdminContentBank() {
   const [pendingSync, setPendingSync] = useState(() => getKnowledgeBankPendingCount());
   const [shareDialog, setShareDialog] = useState<{ title: string; detail: string } | null>(null);
   const [hygieneCount, setHygieneCount] = useState(0);
+  const [seedFailed, setSeedFailed] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  const testResultRef = useRef<HTMLDivElement>(null);
 
   const flashBankError = (message: string) => {
     setNote(message);
     toast.error(message);
+  };
+
+  const scrollMatchedAnswerIntoView = () => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        testResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      });
+    });
   };
 
   const refreshPending = () => setPendingSync(getKnowledgeBankPendingCount());
@@ -123,7 +146,9 @@ export default function AdminContentBank() {
   };
 
   const runPrivacyMigration = async () => {
-    setBusy("Quarantining suspect bank entries…");
+    setToolsOpen(false);
+    setBusyKind("other");
+    setBusy("Working…");
     try {
       const result = await migrateBankPrivacyFlags(bank);
       await reload();
@@ -134,11 +159,13 @@ export default function AdminContentBank() {
       flashBankError(err instanceof Error ? err.message : "Privacy migration failed");
     } finally {
       setBusy("");
+      setBusyKind("");
     }
   };
 
   const syncBankNow = async () => {
-    setBusy("Syncing bank to Firestore…");
+    setBusyKind("other");
+    setBusy("Working…");
     try {
       const result = await flushKnowledgeBankToFirestore();
       refreshPending();
@@ -156,11 +183,21 @@ export default function AdminContentBank() {
       flashBankError(err instanceof Error ? err.message : "Bank sync failed");
     } finally {
       setBusy("");
+      setBusyKind("");
     }
   };
 
   useEffect(() => {
-    void reload();
+    void (async () => {
+      try {
+        await ensureSeedKnowledgeBank();
+        setSeedFailed(false);
+      } catch (err) {
+        console.warn("Automatic bank seed failed", err);
+        setSeedFailed(true);
+      }
+      await reload();
+    })();
     const tick = window.setInterval(() => refreshPending(), 4_000);
     return () => window.clearInterval(tick);
   }, []);
@@ -169,19 +206,41 @@ export default function AdminContentBank() {
     saveAdminBankUi({ panel, query, browseOpen });
   }, [panel, query, browseOpen]);
 
-  const seedBank = async () => {
-    setBusy("Seeding…");
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const onPointer = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (toolsRef.current && !toolsRef.current.contains(target)) setToolsOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
+    };
+  }, [toolsOpen]);
+
+  const seedBank = async (forceRefresh = false) => {
+    setBusyKind("other");
+    setBusy("Working…");
+    setToolsOpen(false);
     try {
-      const result = await ensureSeedKnowledgeBank();
+      const result = await ensureSeedKnowledgeBank({ forceRefresh });
+      setSeedFailed(false);
       setNote(
-        `Knowledge bank seed complete. Added ${result.added}, updated ${result.updated} trained cases. Syncing to Firestore shortly.`,
+        forceRefresh
+          ? `Seed refresh complete. Added ${result.added}, updated ${result.updated}.`
+          : `Starter cases ready. Added ${result.added}, updated ${result.updated}.`,
       );
+      toast.success("Content bank starters are ready.");
       await reload();
       refreshPending();
     } catch (err) {
+      setSeedFailed(true);
       flashBankError(err instanceof Error ? err.message : "Seed failed");
     } finally {
       setBusy("");
+      setBusyKind("");
     }
   };
 
@@ -203,7 +262,8 @@ export default function AdminContentBank() {
 
   const importBankFile = async (file?: File | null) => {
     if (!file) return;
-    setBusy("Importing bank…");
+    setBusyKind("other");
+    setBusy("Working…");
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as { cases?: KnowledgeCase[] } | KnowledgeCase[];
@@ -228,6 +288,7 @@ export default function AdminContentBank() {
       flashBankError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setBusy("");
+      setBusyKind("");
       if (importRef.current) importRef.current.value = "";
     }
   };
@@ -254,8 +315,10 @@ export default function AdminContentBank() {
     );
     if (result.taughtCase) {
       await reload();
-      toast.success(`Gemini taught “${result.taughtCase.title}” (needs review).`);
+      toast.success(`Saved “${result.taughtCase.title}” for review.`);
     }
+    setPanel("test");
+    scrollMatchedAnswerIntoView();
   };
 
   const runBankTest = async (question = testQuestion) => {
@@ -264,7 +327,8 @@ export default function AdminContentBank() {
       flashBankError("Enter a test question first.");
       return;
     }
-    setBusy("Testing bank…");
+    setBusyKind("test");
+    setBusy("Looking up guidance…");
     setTestQuestion(q);
     setTestFlag(null);
     setEditingAnswer(false);
@@ -295,24 +359,27 @@ export default function AdminContentBank() {
         result.urgent
           ? "Urgent combination matched — immediate action shown; product cards suppressed."
           : result.matchedCaseIds.length
-            ? `Matched ${result.matchedCaseIds.length} bank case(s)${language === "sw" ? " · Swahili question" : ""}${result.matchedCaseIds.length > 1 ? " — select an entry before Green approve." : ""}.`
-            : `No bank match yet for that question${language === "sw" ? " (Swahili)" : ""}. Use Ask Gemini + teach if you want a fallback draft.`,
+            ? `Matched ${result.matchedCaseIds.length} case(s)${language === "sw" ? " · Swahili question" : ""}${result.matchedCaseIds.length > 1 ? " — select an entry before Green approve." : ""}.`
+            : `No saved match yet${language === "sw" ? " (Swahili)" : ""}. Use GHP for a draft, or Red · edit to write one yourself.`,
       );
       setPanel("test");
+      scrollMatchedAnswerIntoView();
     } catch (err) {
-      flashBankError(err instanceof Error ? err.message : "Bank test failed");
+      flashBankError(err instanceof Error ? err.message : "Could not look up guidance");
     } finally {
       setBusy("");
+      setBusyKind("");
     }
   };
 
-  const runGeminiTeach = async () => {
+  const runGhpAssist = async () => {
     const q = testQuestion.trim();
     if (!q) {
       flashBankError("Enter a test question first.");
       return;
     }
-    setBusy("Asking Gemini + teaching bank…");
+    setBusyKind("ghp");
+    setBusy("Preparing GHP guidance…");
     setTestFlag(null);
     setEditingAnswer(false);
     try {
@@ -329,45 +396,54 @@ export default function AdminContentBank() {
         { forceGemini: !testMatched.length },
       );
       if (result.source === "bank" && result.matchedCaseIds.length) {
-        setNote("Bank already has a match — Gemini was not called. Green-approve or edit that entry instead.");
+        setNote("A saved match is already available — green-approve or edit that entry instead.");
         await applyTestResult(result, language);
       } else {
         await applyTestResult(result, language);
       }
       setPanel("test");
     } catch (err) {
-      flashBankError(err instanceof Error ? err.message : "Gemini teach failed");
+      flashBankError(err instanceof Error ? err.message : "Could not prepare guidance");
     } finally {
       setBusy("");
+      setBusyKind("");
     }
   };
 
-  const runApprove = async () => {
+  const runApprove = async (flag: "diamond" | "green" = "green") => {
     if (testMatched.length > 1 && !selectedCaseId) {
-      flashBankError("Select which matched bank entry to approve before clicking Green.");
+      flashBankError(`Select which matched bank entry to approve before clicking ${flag === "diamond" ? "Diamond" : "Green"}.`);
       return;
     }
     setShareDialog({
-      title: "Approving bank entry…",
-      detail: "Updating approval status only — keywords, reply fields, and products stay unchanged.",
+      title: flag === "diamond" ? "Promoting to diamond…" : "Approving bank entry…",
+      detail: flag === "diamond"
+        ? "Marking this reply for automatic patient guidance when it matches."
+        : "Updating approval status only — keywords, reply fields, and products stay unchanged.",
     });
-    setBusy("Approving bank entry…");
+    setBusyKind("approve");
+    setBusy("Working…");
     try {
       const learned = await approveBankCase({
         matchedCaseIds: testMatched,
         existingCases: bank,
         selectedCaseId,
-        reviewNote: "Approved in bank testing (metadata only).",
+        qualityFlag: flag,
+        reviewNote: flag === "diamond"
+          ? "Promoted to diamond — eligible for automatic patient replies."
+          : "Approved in bank testing (metadata only).",
       });
       setShareDialog({
         title: "Syncing approval to Firestore…",
         detail: `Saving approval for “${learned.title}”.`,
       });
       const sync = await flushKnowledgeBankToFirestore();
-      setTestFlag("green");
+      setTestFlag(flag);
       setEditingAnswer(false);
       await reload();
-      const ok = `Approved “${learned.title}” (status only). Keywords and reply fields preserved.`;
+      const ok = flag === "diamond"
+        ? `Diamond “${learned.title}” — automatic replies enabled when this matches.`
+        : `Approved “${learned.title}” (status only). Keywords and reply fields preserved.`;
       setNote(`${ok}${sync.synced ? ` Synced ${sync.synced}.` : ""}`);
       toast.success(ok);
     } catch (err) {
@@ -378,6 +454,7 @@ export default function AdminContentBank() {
       }
     } finally {
       setBusy("");
+      setBusyKind("");
       setShareDialog(null);
     }
   };
@@ -395,7 +472,8 @@ export default function AdminContentBank() {
       title: "Saving correction to bank…",
       detail: "Saving only the structured fields you changed. Entry stays ready for Green approval.",
     });
-    setBusy("Saving correction to bank…");
+    setBusyKind("other");
+    setBusy("Working…");
     try {
       let sw = editReplySw.trim();
       if (!sw && editConcerns.trim()) {
@@ -443,6 +521,7 @@ export default function AdminContentBank() {
       }
     } finally {
       setBusy("");
+      setBusyKind("");
       setShareDialog(null);
     }
   };
@@ -457,11 +536,15 @@ export default function AdminContentBank() {
       setEditProductIntro(primary?.replyRecommendationsIntro || "");
       setEditClosing(primary?.replyClosing || "");
       setEditReplySw(primary?.summarySw || testReplySw);
-      setNote("Red · edit structured fields, then save. Green later approves without rewriting keywords.");
+      setNote("Red · edit structured fields, then save. Green or Diamond later approves without rewriting keywords.");
+      return;
+    }
+    if (flag === "diamond") {
+      void runApprove("diamond");
       return;
     }
     if (flag === "green") {
-      void runApprove();
+      void runApprove("green");
       return;
     }
     // Yellow · unconfirmed — metadata only (same as approve, yellow flag).
@@ -499,6 +582,47 @@ export default function AdminContentBank() {
     return hay.includes(query.trim().toLowerCase());
   }), [bank, query]);
 
+  const entriesTotalPages = pageCount(filtered.length, entriesPageSize);
+  const pagedFiltered = useMemo(
+    () => slicePage(filtered, entriesPage, entriesPageSize),
+    [filtered, entriesPage, entriesPageSize],
+  );
+
+  const browseTotalPages = pageCount(bank.length, browsePageSize);
+  const pagedBrowse = useMemo(
+    () => slicePage(bank, browsePage, browsePageSize),
+    [bank, browsePage, browsePageSize],
+  );
+
+  useEffect(() => {
+    setEntriesPage(1);
+  }, [query, entriesPageSize]);
+
+  useEffect(() => {
+    if (!browseOpen) return;
+    setBrowsePage(1);
+  }, [browseOpen]);
+
+  useEffect(() => {
+    setBrowsePage(1);
+  }, [browsePageSize, bank.length]);
+
+  const statusCounts = useMemo(() => {
+    let needsReview = 0;
+    let quarantined = 0;
+    let inactive = 0;
+    let diamond = 0;
+    let enrichPending = 0;
+    for (const item of bank) {
+      if (item.reviewStatus === "needs_review") needsReview += 1;
+      if (item.reviewStatus === "quarantined") quarantined += 1;
+      if (item.active === false) inactive += 1;
+      if (item.qualityFlag === "diamond") diamond += 1;
+      if (item.pendingEnrich) enrichPending += 1;
+    }
+    return { needsReview, quarantined, inactive, diamond, enrichPending };
+  }, [bank]);
+
   const matchedTitles = testMatched
     .map((id) => bank.find((item) => item.id === id)?.title || id)
     .filter(Boolean);
@@ -508,7 +632,7 @@ export default function AdminContentBank() {
       {shareDialog && (
         <div className="modal-backdrop bank-share-backdrop" role="alertdialog" aria-live="assertive" aria-busy="true">
           <div className="bank-share-dialog">
-            <Loader2 size={28} className="spin" aria-hidden />
+            <ButtonBusyMark size={28} />
             <div>
               <p className="eyebrow">Content bank</p>
               <h3>{shareDialog.title}</h3>
@@ -521,72 +645,129 @@ export default function AdminContentBank() {
         <div>
           <p className="eyebrow">Library</p>
           <h1>Content bank</h1>
-          <p>
-            Train answers for screenings and help notes. Edits save locally first, then sync to Firestore
-            after a short quiet period (or use Sync now). Routes are served from Firebase Hosting.
-          </p>
+          <p>Train answers for screenings and help notes. Starters load automatically; edits sync in the background.</p>
+          <div className="bank-status-badges" aria-label="Bank status">
+            {pendingSync > 0 && (
+              <button
+                type="button"
+                className="bank-status-badge is-sync"
+                disabled={Boolean(busy)}
+                title="Changes sync automatically — click to sync now"
+                onClick={() => void syncBankNow()}
+              >
+                <CloudUpload size={13} /> Syncing {pendingSync}
+              </button>
+            )}
+            {statusCounts.diamond > 0 && (
+              <span className="bank-status-badge is-diamond">{statusCounts.diamond} diamond</span>
+            )}
+            {statusCounts.needsReview > 0 && (
+              <span className="bank-status-badge is-review">{statusCounts.needsReview} review</span>
+            )}
+            {statusCounts.quarantined > 0 && (
+              <span className="bank-status-badge is-quarantine">{statusCounts.quarantined} hidden</span>
+            )}
+            {statusCounts.inactive > 0 && (
+              <span className="bank-status-badge is-inactive">{statusCounts.inactive} inactive</span>
+            )}
+            {statusCounts.enrichPending > 0 && (
+              <span className="bank-status-badge is-enrich">{statusCounts.enrichPending} enrich</span>
+            )}
+            {hygieneCount > 0 && (
+              <button
+                type="button"
+                className="bank-status-badge is-hygiene"
+                onClick={downloadHygieneReport}
+                title="Download hygiene review"
+              >
+                {hygieneCount} hygiene
+              </button>
+            )}
+            {seedFailed && (
+              <button
+                type="button"
+                className="bank-status-badge is-seed-fail"
+                disabled={Boolean(busy)}
+                title="Automatic starters failed — click to retry"
+                onClick={() => void seedBank(false)}
+              >
+                <BookOpen size={13} /> Seed failed · retry
+              </button>
+            )}
+          </div>
         </div>
         <div className="admin-header-actions">
-          <button type="button" className="button button-secondary" onClick={() => void seedBank()}>
-            <BookOpen size={16} /> Seed bank
-          </button>
           <button type="button" className="button button-secondary" onClick={() => setBrowseOpen(true)}>
             <List size={16} /> Browse all
           </button>
-          <button type="button" className="button button-secondary" onClick={downloadBank} disabled={!bank.length}>
-            <Download size={16} /> Download bank
-          </button>
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={downloadHygieneReport}
-            disabled={!bank.length}
-            title="Review suspected approval-added keywords and duplicated reply text before cleaning"
-          >
-            <Download size={16} /> Hygiene review{hygieneCount ? ` (${hygieneCount})` : ""}
-          </button>
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={() => void runPrivacyMigration()}
-            disabled={!bank.length || Boolean(busy)}
-            title="Mark legacy PII / patient-titled entries as quarantined or needs_review (repeatable)"
-          >
-            Privacy migrate
-          </button>
-          <label className={`button button-secondary upload-button ${busy ? "is-disabled" : ""}`}>
-            <Upload size={16} /> Import JSON
-            <input
-              ref={importRef}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              disabled={Boolean(busy)}
-              onChange={(e) => void importBankFile(e.target.files?.[0])}
-            />
-          </label>
           <button type="button" className="button button-secondary" onClick={() => void reload()}>
             <RefreshCw size={16} /> Refresh
           </button>
-          <button
-            type="button"
-            className="button button-secondary"
-            disabled={Boolean(busy) || pendingSync <= 0}
-            onClick={() => void syncBankNow()}
-          >
-            <CloudUpload size={16} /> Sync now{pendingSync > 0 ? ` (${pendingSync})` : ""}
-          </button>
+          <div className="bank-tools" ref={toolsRef}>
+            <button
+              type="button"
+              className="button button-secondary"
+              aria-expanded={toolsOpen}
+              onClick={() => setToolsOpen((v) => !v)}
+            >
+              Tools
+            </button>
+            {toolsOpen && (
+              <div className="bank-tools-menu" role="menu">
+                <button type="button" role="menuitem" disabled={!bank.length} onClick={() => { setToolsOpen(false); downloadBank(); }}>
+                  <Download size={15} /> Download bank
+                </button>
+                <button type="button" role="menuitem" disabled={!bank.length} onClick={() => { setToolsOpen(false); downloadHygieneReport(); }}>
+                  <Download size={15} /> Hygiene review
+                </button>
+                <label className={`bank-tools-upload ${busy ? "is-disabled" : ""}`}>
+                  <Upload size={15} /> Import JSON
+                  <input
+                    ref={importRef}
+                    type="file"
+                    accept="application/json,.json"
+                    hidden
+                    disabled={Boolean(busy)}
+                    onChange={(e) => {
+                      setToolsOpen(false);
+                      void importBankFile(e.target.files?.[0]);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!bank.length || Boolean(busy)}
+                  onClick={() => void runPrivacyMigration()}
+                >
+                  Privacy migrate
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={Boolean(busy)}
+                  title="Manual fallback — only if automatic starters failed"
+                  onClick={() => void seedBank(true)}
+                >
+                  <BookOpen size={15} /> Force re-seed
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={Boolean(busy) || pendingSync <= 0}
+                  onClick={() => { setToolsOpen(false); void syncBankNow(); }}
+                >
+                  <CloudUpload size={15} /> Sync now{pendingSync > 0 ? ` (${pendingSync})` : ""}
+                </button>
+              </div>
+            )}
+          </div>
           <button type="button" className="button button-primary" onClick={() => setBankEdit(emptyBankCase())}>
             <Plus size={16} /> Add entry
           </button>
         </div>
       </div>
 
-      {pendingSync > 0 && (
-        <p className="sync-note">
-          {pendingSync} bank change{pendingSync === 1 ? "" : "s"} waiting to sync to Firestore (auto in ~12s, or Sync now).
-        </p>
-      )}
       {note && <p className="sync-note">{note}</p>}
       {busy && <p className="muted">{busy}</p>}
 
@@ -613,7 +794,7 @@ export default function AdminContentBank() {
 
           <section className="admin-panel">
             <div className="admin-product-list">
-              {filtered.map((item) => (
+              {pagedFiltered.map((item) => (
                 <div key={item.id} className="admin-product-row admin-list-row-2">
                   <div className="admin-product-name">
                     <b>{item.title}</b>
@@ -621,14 +802,32 @@ export default function AdminContentBank() {
                       {item.reviewStatus ? `${item.reviewStatus} · ` : ""}
                       {item.active === false ? "inactive · " : ""}
                       {item.qualityFlag ? `${item.qualityFlag.toUpperCase()} · ` : ""}
+                      {item.pendingEnrich ? "enrich pending · " : ""}
+                      {item.autoHitCount ? `${item.autoHitCount} hits · ` : ""}
                       Diseases: {(item.diseases || []).join(", ") || "—"} · Keywords: {[...(item.keywords || []), ...(item.triggersEn || []), ...(item.triggersSw || [])].slice(0, 6).join(", ")}
                     </small>
                   </div>
                   <button type="button" className="button button-secondary" onClick={() => setBankEdit(item)}>Edit</button>
                 </div>
               ))}
-              {!filtered.length && <p className="muted">Bank empty — seed starter entries, import JSON, or add your own.</p>}
+              {!filtered.length && (
+                <p className="muted">
+                  Bank empty — starters load automatically.
+                  {seedFailed ? " Automatic seed failed — use Tools → Force re-seed." : " Or add your own entry."}
+                </p>
+              )}
             </div>
+            {filtered.length > 0 && (
+              <ListPager
+                page={entriesPage}
+                totalPages={entriesTotalPages}
+                onPageChange={setEntriesPage}
+                pageSize={entriesPageSize}
+                pageSizeOptions={BANK_PAGE_SIZES}
+                onPageSizeChange={(n) => setEntriesPageSize(n as BankPageSize)}
+                pageSizeAriaLabel="Bank entries per page"
+              />
+            )}
           </section>
         </>
       )}
@@ -645,7 +844,7 @@ export default function AdminContentBank() {
             </button>
           </div>
           <p className="muted" style={{ marginTop: 0 }}>
-            Ask in English or Kiswahili. Rate the answer green (approve), yellow (ok / unconfirmed), or red (edit &amp; teach the bank).
+            Ask in English or Kiswahili. Rate diamond (auto-reply), green (approve), yellow (ok / unconfirmed), or red (edit &amp; teach the bank).
           </p>
           <div className="help-chip-row" style={{ marginBottom: 12 }}>
             {SAMPLE_QUESTIONS.map((sample) => (
@@ -670,23 +869,23 @@ export default function AdminContentBank() {
           </label>
           <div className="editor-actions" style={{ marginTop: 10 }}>
             <button type="button" className="button button-primary" disabled={Boolean(busy)} onClick={() => void runBankTest()}>
-              <FlaskConical size={16} /> See bank answer
+              {busyKind === "test" ? <><ButtonBusyMark /> Looking up…</> : <><FlaskConical size={16} /> See bank answer</>}
             </button>
             <button
               type="button"
-              className="button button-secondary"
+              className="button button-secondary ghp-assist-button"
               disabled={Boolean(busy) || (Boolean(testReply) && testMatched.length > 0)}
-              title="Only when the bank has no match — one Gemini call, then save needs_review"
-              onClick={() => void runGeminiTeach()}
+              title="Prepare a GHP draft when no saved match exists"
+              onClick={() => void runGhpAssist()}
             >
-              <Sparkles size={16} /> Ask Gemini + teach
+              <GhpAssistLabel busy={busyKind === "ghp"} />
             </button>
           </div>
           {testReply && (
-            <div className="bank-test-result">
+            <div className="bank-test-result" ref={testResultRef} tabIndex={-1}>
               <p className="eyebrow">Matched cases</p>
               {!testMatched.length ? (
-                <p>None — use <b>Ask Gemini + teach</b> for a fallback draft, or Red · edit to write one yourself</p>
+                <p>None — use <b>GHP</b> for a draft, or Red · edit to write one yourself</p>
               ) : testMatched.length === 1 ? (
                 <p>{matchedTitles[0]}</p>
               ) : (
@@ -760,7 +959,8 @@ export default function AdminContentBank() {
                       disabled={Boolean(busy) || !editConcerns.trim()}
                       onClick={() => {
                         void (async () => {
-                          setBusy("Translating EN → SW…");
+                          setBusyKind("other");
+                          setBusy("Working…");
                           try {
                             const sw = await translateEnglishToSwahili(
                               [editOpening, editConcerns, editClosing].filter(Boolean).join("\n\n"),
@@ -771,11 +971,12 @@ export default function AdminContentBank() {
                             flashBankError(err instanceof Error ? err.message : "Translate failed");
                           } finally {
                             setBusy("");
+                            setBusyKind("");
                           }
                         })();
                       }}
                     >
-                      Translate EN → SW
+                      {busyKind === "other" && busy ? <><ButtonBusyMark /> Working…</> : "Translate EN → SW"}
                     </button>
                     <button
                       type="button"
@@ -811,9 +1012,18 @@ export default function AdminContentBank() {
                 <div className="bank-quality-actions">
                   <button
                     type="button"
+                    className={`bank-flag-btn diamond ${testFlag === "diamond" ? "is-active" : ""}`}
+                    disabled={Boolean(busy)}
+                    title="Top tier — patients can receive this reply automatically"
+                    onClick={() => onQualityClick("diamond")}
+                  >
+                    Diamond · auto-reply
+                  </button>
+                  <button
+                    type="button"
                     className={`bank-flag-btn green ${testFlag === "green" ? "is-active" : ""}`}
                     disabled={Boolean(busy)}
-                    title="Approve — system should reply like this"
+                    title="Approve — admin-assisted drafts for similar questions"
                     onClick={() => onQualityClick("green")}
                   >
                     Green · approve
@@ -843,7 +1053,8 @@ export default function AdminContentBank() {
                       disabled={Boolean(busy)}
                       onClick={() => {
                         setEditingAnswer(true);
-                        setEditReplyEn(testReply);
+                        setEditOpening(testReply.split(/\n\n+/)[0] || "");
+                        setEditConcerns(testReply);
                         setEditReplySw(testReplySw);
                       }}
                     >
@@ -852,7 +1063,7 @@ export default function AdminContentBank() {
                   )}
                 </div>
                 <p className="muted" style={{ margin: "8px 0 0" }}>
-                  Green saves and approves this reply for similar questions. Yellow keeps it usable but unconfirmed.
+                  Diamond enables automatic patient replies. Green is for admin-assisted drafts. Yellow keeps it usable but unconfirmed.
                   Red opens the editor — after you save, the bank learns the new answer.
                 </p>
               </div>
@@ -872,7 +1083,7 @@ export default function AdminContentBank() {
               <button type="button" className="icon-button" onClick={() => setBrowseOpen(false)}>×</button>
             </div>
             <div className="bank-browse-list">
-              {bank.map((item) => (
+              {pagedBrowse.map((item) => (
                 <article key={item.id} className="bank-browse-card">
                   <b>{item.title}</b>
                   <small>ID: {item.id}</small>
@@ -889,6 +1100,17 @@ export default function AdminContentBank() {
               ))}
               {!bank.length && <p className="muted">No entries yet.</p>}
             </div>
+            {bank.length > 0 && (
+              <ListPager
+                page={browsePage}
+                totalPages={browseTotalPages}
+                onPageChange={setBrowsePage}
+                pageSize={browsePageSize}
+                pageSizeOptions={BANK_PAGE_SIZES}
+                onPageSizeChange={(n) => setBrowsePageSize(n as BankPageSize)}
+                pageSizeAriaLabel="Browse library entries per page"
+              />
+            )}
             <div className="editor-actions">
               <button type="button" className="button button-secondary" onClick={downloadBank} disabled={!bank.length}>
                 <Download size={16} /> Download JSON
@@ -951,7 +1173,8 @@ export default function AdminContentBank() {
                 onClick={() => {
                   void (async () => {
                     if (!bankEdit.title.trim()) return;
-                    setBusy("Saving bank entry…");
+                    setBusyKind("other");
+                    setBusy("Working…");
                     try {
                       await saveKnowledgeCase(bankEdit);
                       setBankEdit(null);
@@ -962,11 +1185,12 @@ export default function AdminContentBank() {
                       flashBankError(err instanceof Error ? err.message : "Save failed");
                     } finally {
                       setBusy("");
+                      setBusyKind("");
                     }
                   })();
                 }}
               >
-                Save to bank
+                {busy ? <><ButtonBusyMark /> Saving…</> : "Save to bank"}
               </button>
             </div>
           </section>

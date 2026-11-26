@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.translateToSwahili = exports.createMediaUploadUrl = exports.generateWellnessReply = exports.matchContentBankFn = void 0;
+exports.translateToSwahili = exports.createMediaUploadUrl = exports.assistStoreSearch = exports.confirmDiamondReply = exports.generateWellnessReply = exports.matchContentBankFn = void 0;
 /**
  * Cloud Functions for GreenHealthProducts.
  * - Content-bank keyword match (admin)
@@ -53,8 +53,14 @@ const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const b2_1 = require("./b2");
 const generateWellnessReply_1 = require("./generateWellnessReply");
+const confirmDiamondReply_1 = require("./confirmDiamondReply");
+const assistStoreSearch_1 = require("./assistStoreSearch");
+const rateLimit_1 = require("./rateLimit");
 (0, app_1.initializeApp)();
 const db = (0, firestore_1.getFirestore)();
+function rawReq(request) {
+    return request.rawRequest;
+}
 const ALLOWED_PURPOSES = new Set(["profile", "product", "screening", "report"]);
 async function assertSignedIn(uid) {
     if (!uid)
@@ -131,6 +137,15 @@ function resolveUploadKey(uid, isAdmin, purpose, fileName, contentType, productI
 }
 exports.matchContentBankFn = (0, https_1.onCall)(async (request) => {
     await assertAdmin(request.auth?.uid);
+    const who = (0, rateLimit_1.rateLimitIdentity)(request.auth?.uid, rawReq(request));
+    await (0, rateLimit_1.assertRateLimit)(db, {
+        key: `callable:${who}`,
+        ...rateLimit_1.RATE_PRESETS.callableUser,
+    });
+    await (0, rateLimit_1.assertRateLimit)(db, {
+        key: `matchBank:${who}`,
+        ...rateLimit_1.RATE_PRESETS.matchBankUser,
+    });
     const text = String(request.data?.text || "").toLowerCase();
     if (!text)
         throw new https_1.HttpsError("invalid-argument", "text required");
@@ -144,7 +159,10 @@ exports.matchContentBankFn = (0, https_1.onCall)(async (request) => {
             return null;
         if (data.qualityFlag === "red")
             return null;
-        const approved = data.reviewStatus === "approved" || data.qualityFlag === "green" || !data.reviewStatus;
+        const approved = data.reviewStatus === "approved"
+            || data.qualityFlag === "diamond"
+            || data.qualityFlag === "green"
+            || !data.reviewStatus;
         if (!approved && data.qualityFlag === "yellow")
             return null;
         const triggers = [
@@ -171,8 +189,12 @@ exports.matchContentBankFn = (0, https_1.onCall)(async (request) => {
  * Set GEMINI_API_KEY in functions/.env (Google AI Studio free tier) and redeploy functions.
  * Patients never call this; bank answers first in the client orchestrator.
  */
-exports.generateWellnessReply = (0, https_1.onCall)({ cors: true, maxInstances: 10, timeoutSeconds: 60 }, async (request) => {
+exports.generateWellnessReply = (0, https_1.onCall)({ cors: true, maxInstances: 5, timeoutSeconds: 60 }, async (request) => {
     await assertAdmin(request.auth?.uid);
+    const who = (0, rateLimit_1.rateLimitIdentity)(request.auth?.uid, rawReq(request));
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `ai:global`, ...rateLimit_1.RATE_PRESETS.aiGlobal });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `ai:admin:${who}`, ...rateLimit_1.RATE_PRESETS.aiAdminUser });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `callable:${who}`, ...rateLimit_1.RATE_PRESETS.callableUser });
     const input = (0, generateWellnessReply_1.assertGenerateInput)(request.data);
     const result = await (0, generateWellnessReply_1.generateWellnessReplyCore)(input);
     console.info("generateWellnessReply", {
@@ -185,10 +207,52 @@ exports.generateWellnessReply = (0, https_1.onCall)({ cors: true, maxInstances: 
     });
     return { ok: true, ...result };
 });
+/**
+ * Signed-in patient (or admin): confirm a diamond bank match and personalize reply text.
+ * Used for automatic My-results sharing without admin intervention.
+ */
+exports.confirmDiamondReply = (0, https_1.onCall)({ cors: true, maxInstances: 8, timeoutSeconds: 60 }, async (request) => {
+    await assertSignedIn(request.auth?.uid);
+    const who = (0, rateLimit_1.rateLimitIdentity)(request.auth?.uid, rawReq(request));
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `ai:global`, ...rateLimit_1.RATE_PRESETS.aiGlobal });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `ai:diamond:${who}`, ...rateLimit_1.RATE_PRESETS.aiDiamondUser });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `callable:${who}`, ...rateLimit_1.RATE_PRESETS.callableUser });
+    const input = (0, confirmDiamondReply_1.assertConfirmDiamondInput)(request.data);
+    const result = await (0, confirmDiamondReply_1.confirmDiamondReplyCore)(input);
+    console.info("confirmDiamondReply", {
+        ok: result.ok,
+        source: result.source,
+        language: input.language,
+        candidateId: input.candidate.id,
+    });
+    return result;
+});
+/**
+ * Store search assist: optional auth. Catalog-only product codes; wellness drafts need client confirm.
+ */
+exports.assistStoreSearch = (0, https_1.onCall)({ cors: true, maxInstances: 5, timeoutSeconds: 45 }, async (request) => {
+    const who = (0, rateLimit_1.rateLimitIdentity)(request.auth?.uid, rawReq(request));
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `callable:${who}`, ...rateLimit_1.RATE_PRESETS.callableUser });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `ai:global`, ...rateLimit_1.RATE_PRESETS.aiGlobal });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `ai:assist:${who}`, ...rateLimit_1.RATE_PRESETS.aiAssistUser });
+    const input = (0, assistStoreSearch_1.assertAssistStoreSearchInput)(request.data);
+    const result = await (0, assistStoreSearch_1.assistStoreSearchCore)(input);
+    console.info("assistStoreSearch", {
+        mode: result.mode,
+        source: result.source,
+        needsConfirm: result.needsConfirm,
+        productCount: result.productCodes.length,
+        language: input.language,
+    });
+    return { ok: true, ...result };
+});
 /** Presign a Backblaze B2 PUT. Client uploads directly; returns public HTTPS URL. */
-exports.createMediaUploadUrl = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.createMediaUploadUrl = (0, https_1.onCall)({ cors: true, maxInstances: 10 }, async (request) => {
     const uid = request.auth?.uid;
     await assertSignedIn(uid);
+    const who = (0, rateLimit_1.rateLimitIdentity)(uid, rawReq(request));
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `callable:${who}`, ...rateLimit_1.RATE_PRESETS.callableUser });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `upload:${who}`, ...rateLimit_1.RATE_PRESETS.uploadUser });
     const cfg = (0, b2_1.readB2Config)();
     if (!cfg) {
         throw new https_1.HttpsError("failed-precondition", "Backblaze B2 is not configured. Set B2_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET, B2_ENDPOINT, and B2_PUBLIC_BASE_URL on Cloud Functions.");
@@ -230,8 +294,11 @@ exports.createMediaUploadUrl = (0, https_1.onCall)({ cors: true }, async (reques
  * Translate English wellness copy → Kiswahili for bank replies / report summaries.
  * Uses google-translate-api-x server-side (avoids browser CORS limits).
  */
-exports.translateToSwahili = (0, https_1.onCall)({ cors: true, maxInstances: 10 }, async (request) => {
+exports.translateToSwahili = (0, https_1.onCall)({ cors: true, maxInstances: 5 }, async (request) => {
     await assertSignedIn(request.auth?.uid);
+    const who = (0, rateLimit_1.rateLimitIdentity)(request.auth?.uid, rawReq(request));
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `callable:${who}`, ...rateLimit_1.RATE_PRESETS.callableUser });
+    await (0, rateLimit_1.assertRateLimit)(db, { key: `translate:${who}`, ...rateLimit_1.RATE_PRESETS.translateUser });
     const text = String(request.data?.text || "").trim();
     if (!text)
         throw new https_1.HttpsError("invalid-argument", "text is required");

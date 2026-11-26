@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
+import ButtonBusyMark from "@/components/ButtonBusyMark";
 import { listPatients } from "@/lib/patients";
 import {
   markIntakesAdminSeen,
   saveIntake,
   subscribeAllIntakes,
 } from "@/lib/intakes";
-import { ensureScreeningDraftFromIntake, withHelpFormGreenItems } from "@/lib/intakeToScreening";
+import { withHelpFormGreenItems } from "@/lib/intakeToScreening";
 import {
-  draftFromContentBank,
-  draftIntakeFromContentBank,
-  withBankMatchMeta,
-} from "@/lib/replyFromBank";
+  processHelpInquiry,
+  screeningNeedsAutoMatch,
+} from "@/lib/processHelpInquiry";
 import { getScreening, saveScreening, subscribeAllScreenings } from "@/lib/screenings";
 import { formatIntakeDate } from "@/lib/intakeSummary";
 import { initialsFromName } from "@/lib/patientAvatar";
@@ -23,6 +23,8 @@ import {
 } from "@/lib/conversationThreads";
 import { loadAdminHelpUi, saveAdminHelpUi } from "@/lib/adminUiState";
 import type { Intake, Patient, Screening } from "@/lib/screeningTypes";
+import ListPager from "@/components/ListPager";
+import { PAGE_SIZE_DEFAULT, pageCount, slicePage } from "@/lib/listPaging";
 import ScreeningWizard from "@/pages/ScreeningWizard";
 
 type ListFilter = "all" | "unread" | "open";
@@ -89,6 +91,7 @@ export default function AdminHelpInbox() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filter, setFilter] = useState<ListFilter>(() => savedUi.filter || "all");
   const [query, setQuery] = useState(() => savedUi.query || "");
+  const [listPage, setListPage] = useState(1);
   const [selectedKey, setSelectedKey] = useState<string | null>(() => savedUi.selectedKey || null);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(() => Boolean(savedUi.mobileThreadOpen));
   const [busy, setBusy] = useState("");
@@ -96,16 +99,44 @@ export default function AdminHelpInbox() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardScreening, setWizardScreening] = useState<Screening | null>(null);
   const threadBodyRef = useRef<HTMLDivElement | null>(null);
+  const autoMatchTriedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubIntakes = subscribeAllIntakes(setIntakes);
     const unsubScreenings = subscribeAllScreenings(setScreenings);
     void listPatients().then(setPatients);
+    // Prefetch wizard hydrate chunk so Open in wizard does not stall on import.
+    void import("@/lib/hydrateSubjectFromProfile");
     return () => {
       unsubIntakes();
       unsubScreenings();
     };
   }, []);
+
+  // Backfill: any pending help note that never got auto-matched (old sessions / failed client).
+  useEffect(() => {
+    let cancelled = false;
+    const pending = intakes.filter((intake) =>
+      intake.status === "pending" || intake.status === "in_review"
+    );
+    void (async () => {
+      for (const intake of pending) {
+        if (cancelled) break;
+        if (autoMatchTriedRef.current.has(intake.id)) continue;
+        autoMatchTriedRef.current.add(intake.id);
+        try {
+          const existing = intake.screeningId ? await getScreening(intake.screeningId) : null;
+          if (!screeningNeedsAutoMatch(existing)) continue;
+          await processHelpInquiry({ intake, authUid: intake.authUid });
+        } catch (err) {
+          console.warn("Background help auto-match skipped:", err instanceof Error ? err.message : err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [intakes]);
 
   useEffect(() => {
     saveAdminHelpUi({ filter, query, selectedKey, mobileThreadOpen });
@@ -126,6 +157,16 @@ export default function AdminHelpInbox() {
       return hay.includes(q);
     });
   }, [threads, filter, query]);
+
+  const threadsTotalPages = pageCount(visibleThreads.length, PAGE_SIZE_DEFAULT);
+  const pagedThreads = useMemo(
+    () => slicePage(visibleThreads, listPage, PAGE_SIZE_DEFAULT),
+    [visibleThreads, listPage],
+  );
+
+  useEffect(() => {
+    setListPage(1);
+  }, [filter, query]);
 
   const selected = useMemo(
     () => threads.find((t) => t.key === selectedKey) || null,
@@ -160,38 +201,24 @@ export default function AdminHelpInbox() {
   };
 
   const openIntakeInWizard = async (intake: Intake) => {
-    setBusy("Opening report wizard…");
+    setBusy("Opening wizard…");
     setNote("");
     try {
-      let screening = await ensureScreeningDraftFromIntake(intake);
-
-      // Initial bank draft only when empty — retry lives in the wizard.
-      if (!(screening.recommendations || []).length && !(screening.simpleConclusion || "").trim()) {
-        const intakeDraft = await draftIntakeFromContentBank(intake);
-        const bankDraft = await draftFromContentBank({
-          ...screening,
-          simpleConclusion: screening.simpleConclusion || intakeDraft.reply,
-          simpleConclusionSw: screening.simpleConclusionSw || intakeDraft.replySw,
-          recommendations: intakeDraft.recommendations,
-        });
-        const recommendations = (bankDraft.recommendations.length
-          ? bankDraft.recommendations
-          : intakeDraft.recommendations).map((r) => ({ ...r, qty: r.qty || 1 }));
-        const matchedIds = bankDraft.matchedCaseIds.length
-          ? bankDraft.matchedCaseIds
-          : intakeDraft.matchedCaseIds;
-        screening = {
-          ...screening,
-          ...withBankMatchMeta(matchedIds),
-          simpleConclusion: bankDraft.conclusion || intakeDraft.reply || screening.simpleConclusion,
-          simpleConclusionSw: bankDraft.conclusionSw || intakeDraft.replySw || screening.simpleConclusionSw,
-          bankDraftConclusion: bankDraft.conclusion,
-          bankDraftConclusionSw: bankDraft.conclusionSw,
-          recommendations,
-          bankDraftRecommendations: recommendations,
-        };
-        await saveScreening(screening);
+      const existing = intake.screeningId ? await getScreening(intake.screeningId) : null;
+      let screening: Screening;
+      if (screeningNeedsAutoMatch(existing)) {
+        setBusy("Finding the best answer…");
+        const processed = await processHelpInquiry({ intake, authUid: intake.authUid });
+        screening = processed.screening;
+        autoMatchTriedRef.current.add(intake.id);
+      } else {
+        screening = existing!;
       }
+
+      setBusy("Opening wizard…");
+      const { hydrateScreeningFromUserProfile } = await import("@/lib/hydrateSubjectFromProfile");
+      screening = await hydrateScreeningFromUserProfile(screening);
+      await saveScreening(screening);
 
       await saveIntake({
         ...intake,
@@ -205,7 +232,11 @@ export default function AdminHelpInbox() {
       if (enriched !== screening) await saveScreening(enriched);
       setWizardScreening(enriched);
       setWizardOpen(true);
-      setNote("Review like an uploaded report, then share.");
+      setNote(
+        (enriched.bankMatchedCaseIds || []).length
+          ? "Matched answer ready — confirm or tweak, then share."
+          : "Review the draft, then share.",
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not open wizard";
       setNote(message);
@@ -216,13 +247,28 @@ export default function AdminHelpInbox() {
   };
 
   const openScreeningInWizard = async (screeningId: string) => {
-    setBusy("Opening screening…");
+    setBusy("Opening wizard…");
     setNote("");
     try {
-      const item = await getScreening(screeningId);
+      let item = await getScreening(screeningId);
       if (!item) throw new Error("Screening not found");
+
+      if (item.sourceIntakeId && screeningNeedsAutoMatch(item)) {
+        setBusy("Finding the best answer…");
+        const linked = intakes.find((row) => row.id === item!.sourceIntakeId);
+        if (linked) {
+          const processed = await processHelpInquiry({
+            intake: { ...linked, screeningId: item.id, patientId: item.patientId },
+            authUid: linked.authUid,
+          });
+          item = processed.screening;
+        }
+      }
+
+      const { hydrateScreeningFromUserProfile } = await import("@/lib/hydrateSubjectFromProfile");
+      item = await hydrateScreeningFromUserProfile(item);
       const enriched = withHelpFormGreenItems(item);
-      if (enriched !== item) await saveScreening(enriched);
+      await saveScreening(enriched);
       setWizardScreening(enriched);
       setWizardOpen(true);
     } catch (err) {
@@ -257,7 +303,15 @@ export default function AdminHelpInbox() {
       </div>
 
       {note && <p className="sync-note">{note}</p>}
-      {busy && <p className="muted">{busy}</p>}
+
+      {busy && (
+        <div className="modal-backdrop admin-wizard-loading" role="status" aria-live="polite" aria-busy="true">
+          <div className="admin-wizard-loading-card" onClick={(e) => e.stopPropagation()}>
+            <ButtonBusyMark size={28} />
+            <p>{busy}</p>
+          </div>
+        </div>
+      )}
 
       <div className={`admin-chat-layout ${mobileThreadOpen && selected ? "thread-open" : ""}`}>
         <aside className="admin-chat-list-pane">
@@ -286,7 +340,7 @@ export default function AdminHelpInbox() {
           </div>
 
           <div className="admin-chat-list" role="list">
-            {visibleThreads.map((thread) => {
+            {pagedThreads.map((thread) => {
               const active = thread.key === selectedKey;
               const heading = conversationHeading(thread);
               return (
@@ -315,7 +369,9 @@ export default function AdminHelpInbox() {
                     </span>
                   </span>
                   {thread.unreadCount > 0 && (
-                    <span className="admin-chat-unread">{thread.unreadCount > 99 ? "99+" : thread.unreadCount}</span>
+                    <span className="admin-chat-unread-wrap">
+                      <span className="admin-chat-unread">{thread.unreadCount > 99 ? "99+" : thread.unreadCount}</span>
+                    </span>
                   )}
                 </button>
               );
@@ -330,6 +386,14 @@ export default function AdminHelpInbox() {
               </p>
             )}
           </div>
+          {visibleThreads.length > 0 && (
+            <ListPager
+              page={listPage}
+              totalPages={threadsTotalPages}
+              onPageChange={setListPage}
+              pageSizeAriaLabel="Conversations per page"
+            />
+          )}
         </aside>
 
         <section className="admin-chat-thread-pane" aria-live="polite">

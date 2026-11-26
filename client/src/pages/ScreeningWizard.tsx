@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Download,
   FileText,
-  Loader2,
   Mail,
   MessageCircle,
   Search,
@@ -13,6 +12,8 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import ButtonBusyMark from "@/components/ButtonBusyMark";
+import GhpAssistLabel from "@/components/GhpAssistLabel";
 import { findPatientByEmail, getPatient, upsertPatient } from "@/lib/patients";
 import {
   newScreeningId,
@@ -46,7 +47,6 @@ import { loadProducts, money, type Product } from "@/lib/catalog";
 import { isHttpUrl } from "@/lib/mediaStorage";
 import { initialsFromName } from "@/lib/patientAvatar";
 import type { Screening, ScreeningGroup, ScreeningRecommendation } from "@/lib/screeningTypes";
-import { WELLNESS_DISCLAIMER } from "@/lib/screeningTypes";
 
 function missingRequiredSubject(subject: Screening["subject"]): string[] {
   const missing: string[] = [];
@@ -90,7 +90,6 @@ function buildShareText(screening: Screening): string {
     report.weekActions.length ? `This week:\n${report.weekActions.map((a) => `• ${a}`).join("\n")}\n` : "",
     flags ? `Priority findings:\n${flags}\n` : "",
     products ? `Wellness product plan:\n${products}\nTotal payable: ${report.totalPayableLabel}\n` : "",
-    WELLNESS_DISCLAIMER,
   ]
     .filter(Boolean)
     .join("\n");
@@ -135,7 +134,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
     setActionNote("");
     setShareMenuOpen(false);
     setReviewMenuOpen(false);
-    toast.error(message, { duration: 6000 });
+    toast.error(message, { duration: 2800 });
     if (opts?.goReview) {
       setStep("review");
       requestAnimationFrame(() => {
@@ -307,7 +306,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
       };
 
       setStep("match");
-      setStatusLine("Matching content bank (Gemini only if no match)…");
+      setStatusLine("Finding the best guidance…");
       try {
         await ensureSeedKnowledgeBank();
         const resolved = await resolveScreeningDraftWithGeminiFallback(draft);
@@ -317,7 +316,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
         setBankUpdateNotice("");
         setStatusLine(resolved.message);
       } catch {
-        setStatusLine("Suggestion match skipped — you can still edit manually.");
+        setStatusLine("Guidance lookup skipped — you can still edit manually.");
         setGeminiUsed(false);
       }
 
@@ -360,8 +359,18 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
       let cancelled = false;
       void (async () => {
         try {
+          const { hydrateScreeningFromUserProfile } = await import("@/lib/hydrateSubjectFromProfile");
+          const hydrated = await hydrateScreeningFromUserProfile(enriched);
+          if (!cancelled) {
+            setEditing({
+              ...hydrated,
+              weekActions: hydrated.weekActions || [],
+              recommendations: (hydrated.recommendations || []).map((r) => ({ ...r, qty: r.qty || 1 })),
+            });
+            await saveScreening(hydrated);
+          }
           await ensureSeedKnowledgeBank();
-          const update = await checkBankDraftUpdate(enriched);
+          const update = await checkBankDraftUpdate(hydrated);
           if (!cancelled && update?.hasUpdate) {
             setBankUpdateNotice(update.message);
             setStatusLine(update.message);
@@ -423,7 +432,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
     }
   };
 
-  /** Re-run content bank matching; Gemini only when the bank has no match. */
+  /** Re-run guidance matching; GHP assist only when the bank has no match. */
   const findBestAnswerAgain = async () => {
     if (!editing || actionBusy) return;
     setActionBusy("rematch");
@@ -482,6 +491,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
       sex: screening.subject.sex || existing?.sex || byEmail?.sex,
       age: screening.subject.age || existing?.age || byEmail?.age,
       phone: screening.subject.phone || existing?.phone || byEmail?.phone,
+      photoUrl: screening.subject.photoUrl || existing?.photoUrl || byEmail?.photoUrl,
     });
   };
 
@@ -500,6 +510,13 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
     setActionNote(loadingNote);
     try {
       const patient = await ensurePatientForShare(editing);
+      const { resolvePatientReportTitle } = await import("@/lib/patientReportTitle");
+      const patientReportTitle = editing.patientReportTitle?.trim()
+        || await resolvePatientReportTitle({
+          screening: editing,
+          matchedCaseIds: editing.bankMatchedCaseIds,
+          conclusion: editing.simpleConclusion,
+        });
       const cleaned: Screening = {
         ...editing,
         patientId: patient.id,
@@ -513,6 +530,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
         weekActions: (editing.weekActions || []).map((a) => a.trim()).filter(Boolean).slice(0, 3),
         adminNotes: (editing.adminNotes || "").trim(),
         recommendations: (editing.recommendations || []).map((r) => ({ ...r, qty: r.qty || 1 })),
+        patientReportTitle,
         status: "shared",
         learnApproved: learn || editing.learnApproved,
       };
@@ -674,7 +692,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
         {statusLine && <p className="sync-note">{statusLine}</p>}
         {geminiUsed && (
           <p className="wizard-gemini-badge" role="status">
-            Gemini used (admin fallback) — taught bank entry is needs review until you green-approve.
+            GHP draft prepared — review and green-approve before relying on it.
           </p>
         )}
         {bankUpdateNotice && (
@@ -686,7 +704,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
               disabled={Boolean(actionBusy) || step === "upload" || step === "parse" || step === "match"}
               onClick={() => void findBestAnswerAgain()}
             >
-              {actionBusy === "rematch" ? <><Loader2 size={16} className="spin" /> Matching…</> : <><Search size={16} /> Match updated answer</>}
+              {actionBusy === "rematch" ? <><ButtonBusyMark /> Matching…</> : <><Search size={16} /> Match updated answer</>}
             </button>
           </div>
         )}
@@ -694,8 +712,8 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
 
         {(step === "upload" || step === "parse" || step === "match") && !error && (
           <div className="wizard-progress">
-            <div className="wizard-spinner" />
-            <p>Please wait — {step === "upload" ? "uploading / reading file" : step === "parse" ? "parsing report" : "finding content-bank solutions"}…</p>
+            <ButtonBusyMark size={28} />
+            <p>Please wait — {step === "upload" ? "uploading / reading file" : step === "parse" ? "parsing report" : "finding guidance"}…</p>
           </div>
         )}
 
@@ -890,9 +908,13 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
             )}
 
             <div className="patient-avatar-preview" aria-hidden>
-              <span className="patient-avatar-circle">{initialsFromName(editing.subject.name || "Patient")}</span>
+              {isHttpUrl(editing.subject.photoUrl) ? (
+                <img className="patient-avatar-circle" src={editing.subject.photoUrl} alt="" />
+              ) : (
+                <span className="patient-avatar-circle">{initialsFromName(editing.subject.name || "Patient")}</span>
+              )}
               <small>
-                Report mark uses initials.
+                {isHttpUrl(editing.subject.photoUrl) ? "Profile photo used on the PDF." : "Report mark uses initials until a profile photo is set."}
                 {isHttpUrl(editing.sourceFilePath) ? " Source file is on Backblaze B2." : ""}
                 {isHttpUrl(editing.reportPdfUrl) ? " Patient PDF is on Backblaze B2." : ""}
               </small>
@@ -910,8 +932,6 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
               </p>
             )}
 
-            <p className="notice" style={{ marginTop: 14 }}>{WELLNESS_DISCLAIMER}</p>
-
             {(step === "review" || step === "share") && (
               <p className="muted" style={{ marginTop: 10 }}>
                 Edit freely or leave the draft as matched. Use <b>Share + save to bank</b> (or <b>Save to bank</b>) so similar future questions reuse this answer.
@@ -922,7 +942,7 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
               <>
                 <div className="wizard-action-bar">
                   <button type="button" className="button button-primary wizard-action-main" disabled={Boolean(actionBusy)} onClick={() => void shareAndSave(false)}>
-                    {actionBusy === "share" ? <><Loader2 size={16} className="spin" /> Sharing…</> : <>Proceed to share <ChevronRight size={16} /></>}
+                    {actionBusy === "share" ? <><ButtonBusyMark /> Sharing…</> : <>Proceed to share <ChevronRight size={16} /></>}
                   </button>
                   <div className={`wizard-more ${reviewMenuOpen ? "is-open" : ""}`} ref={reviewMenuRef}>
                     <button
@@ -953,27 +973,27 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
                   </div>
                   <div className="wizard-action-desktop">
                     <button type="button" className="button button-secondary" disabled={Boolean(actionBusy)} onClick={() => void saveDraft()}>
-                      {actionBusy === "draft" ? <><Loader2 size={16} className="spin" /> Saving…</> : "Save draft"}
+                      {actionBusy === "draft" ? <><ButtonBusyMark /> Saving…</> : "Save draft"}
                     </button>
                     <button type="button" className="button button-secondary" disabled={Boolean(actionBusy)} onClick={() => void findBestAnswerAgain()}>
-                      {actionBusy === "rematch" ? <><Loader2 size={16} className="spin" /> Matching…</> : <><Search size={16} /> Find best answer again</>}
+                      {actionBusy === "rematch" ? <><ButtonBusyMark /> Matching…</> : <><Search size={16} /> Find best answer again</>}
                     </button>
                     {matchedCount === 0 && !geminiUsed && (
                       <button
                         type="button"
-                        className="button button-secondary"
+                        className="button button-secondary ghp-assist-button"
                         disabled={Boolean(actionBusy)}
-                        title="Bank had no match — call Gemini once and teach a needs_review entry"
+                        title="Prepare a GHP draft when no saved match exists"
                         onClick={() => void findBestAnswerAgain()}
                       >
-                        {actionBusy === "rematch" ? <><Loader2 size={16} className="spin" /> Asking Gemini…</> : "Ask Gemini + teach"}
+                        <GhpAssistLabel busy={actionBusy === "rematch"} />
                       </button>
                     )}
                     <button type="button" className="button button-secondary" disabled={Boolean(actionBusy)} onClick={() => void saveToBankOnly()}>
-                      {actionBusy === "bank" ? <><Loader2 size={16} className="spin" /> Saving to bank…</> : "Save to bank"}
+                      {actionBusy === "bank" ? <><ButtonBusyMark /> Saving…</> : "Save to bank"}
                     </button>
                     <button type="button" className="button button-primary" disabled={Boolean(actionBusy)} onClick={() => void shareAndSave(true)}>
-                      {actionBusy === "share-bank" ? <><Loader2 size={16} className="spin" /> Sharing + saving…</> : "Share + save to bank"}
+                      {actionBusy === "share-bank" ? <><ButtonBusyMark /> Sharing…</> : "Share + save to bank"}
                     </button>
                   </div>
                 </div>
@@ -1079,11 +1099,11 @@ export default function ScreeningWizard({ open, file, initial, onClose, onSaved 
                       <span className="wizard-more-label">Bank & finish</span>
                       <div className="wizard-share-row">
                         <button type="button" className="button button-secondary" disabled={Boolean(actionBusy)} onClick={() => void saveToBankOnly()}>
-                          {actionBusy === "bank" ? <><Loader2 size={16} className="spin" /> Saving…</> : "Save to bank"}
+                          {actionBusy === "bank" ? <><ButtonBusyMark /> Saving…</> : "Save to bank"}
                         </button>
                         <button type="button" className="button button-primary" disabled={Boolean(actionBusy)} onClick={() => void shareAndSave(true)}>
                           {actionBusy === "share-bank"
-                            ? <><Loader2 size={16} className="spin" /> Sharing…</>
+                            ? <><ButtonBusyMark /> Sharing…</>
                             : (editing.learnApproved ? "Share + update bank" : "Share + save to bank")}
                         </button>
                         <button type="button" className="button button-secondary" disabled={Boolean(actionBusy)} onClick={() => setStep("review")}>Back to edit</button>

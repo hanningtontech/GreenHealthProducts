@@ -1,8 +1,7 @@
 import { jsPDF } from "jspdf";
 import { buildPatientReport, type PatientReportModel, type ReportVariant } from "@/lib/buildPatientReport";
-import { buildAvatarDataUrl } from "@/lib/patientAvatar";
+import { resolveAvatarDataUrl } from "@/lib/patientAvatar";
 import type { Screening } from "@/lib/screeningTypes";
-import { WELLNESS_DISCLAIMER } from "@/lib/screeningTypes";
 
 const FOREST: [number, number, number] = [29, 77, 58];
 const GOLD: [number, number, number] = [216, 166, 78];
@@ -202,8 +201,11 @@ async function buildPatientReportPdfDoc(
   safeName: string;
 }> {
   const model = buildPatientReport(screening, undefined, variant);
-  const avatarDataUrl = buildAvatarDataUrl(model.subject.name || "Patient");
   const isFull = model.variant === "full";
+  const headline = model.headline || model.subject.name || "Wellness report";
+  const avatarDataUrl = isFull
+    ? await resolveAvatarDataUrl(model.subject.name || "Patient", model.subject.photoUrl)
+    : null;
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -212,29 +214,33 @@ async function buildPatientReportPdfDoc(
 
   drawHeader(doc, model);
 
-  // Avatar + identity row
+  // Patient simple PDF: issue headline. Full details: keep identity for clinical use.
   const avatarSize = 18;
-  if (avatarDataUrl) {
+  if (isFull && avatarDataUrl) {
     try {
-      doc.addImage(avatarDataUrl, "PNG", MARGIN_X, y - 2, avatarSize, avatarSize);
+      const format = avatarDataUrl.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+      doc.addImage(avatarDataUrl, format, MARGIN_X, y - 2, avatarSize, avatarSize);
     } catch {
       // ignore
     }
   }
-  const idX = MARGIN_X + avatarSize + 5;
+  const idX = isFull && avatarDataUrl ? MARGIN_X + avatarSize + 5 : MARGIN_X;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...INK);
-  doc.text(model.subject.name || "Patient", idX, y + 5);
+  const headingLines = doc.splitTextToSize(isFull ? (model.subject.name || headline) : headline, maxW - (idX - MARGIN_X));
+  doc.text(headingLines, idX, y + 5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...MUTED);
   doc.text(
-    `${model.subject.age ?? "—"} · ${model.subject.sex || "—"} · Test ${model.testDate}${model.testTime ? ` · ${model.testTime}` : ""}`,
+    isFull
+      ? `${model.subject.age ?? "—"} · ${model.subject.sex || "—"} · Test ${model.testDate}${model.testTime ? ` · ${model.testTime}` : ""}`
+      : `Test ${model.testDate}${model.testTime ? ` · ${model.testTime}` : ""}${model.subject.age != null && model.subject.age !== "" ? ` · age ${model.subject.age}` : ""}${model.subject.sex ? ` · ${model.subject.sex}` : ""}`,
     idX,
-    y + 11,
+    y + 5 + headingLines.length * 5,
   );
-  y += avatarSize + 6;
+  y += Math.max(avatarSize, 8 + headingLines.length * 5) + 6;
 
   // Meta card
   const metaPairs: Array<[string, string]> = [
@@ -280,7 +286,10 @@ async function buildPatientReportPdfDoc(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...INK);
-  for (const line of wrapLines(doc, model.simpleConclusion, maxW)) {
+  const conclusionBody = isFull && model.fullConclusion
+    ? model.fullConclusion
+    : model.simpleConclusion;
+  for (const line of wrapLines(doc, conclusionBody, maxW)) {
     y = ensureSpace(doc, model, y, 6);
     doc.text(line, MARGIN_X, y);
     y += 5;
@@ -482,7 +491,8 @@ async function buildPatientReportPdfDoc(
       );
       const outcome = isFull ? wrapLines(doc, `Recommended outcome: ${line.outcome}`, innerW) : [];
       const ingredients = isFull ? wrapLines(doc, `Package ingredients: ${line.ingredients}`, innerW) : [];
-      const usage = isFull ? wrapLines(doc, `How to use: ${line.usage}`, innerW) : [];
+      const usageGap = isFull && line.usage ? 3 : 0;
+      const usage = isFull ? wrapLines(doc, line.usage, innerW) : [];
       const warn = isFull ? wrapLines(doc, `Cautions: ${line.warnings}`, innerW) : [];
       const blockH =
         PAD * 2
@@ -492,6 +502,8 @@ async function buildPatientReportPdfDoc(
         + why.length * 4
         + outcome.length * 4
         + ingredients.length * 4
+        + usageGap
+        + (usage.length ? 5 : 0)
         + usage.length * 4
         + warn.length * 4
         + 2;
@@ -517,11 +529,29 @@ async function buildPatientReportPdfDoc(
         ty += 4;
       }
       doc.setTextColor(...INK);
-      for (const group of [why, outcome, ingredients, usage, warn]) {
+      for (const group of [why, outcome, ingredients]) {
         for (const l of group) {
           doc.text(l, textX, ty);
           ty += 4;
         }
+      }
+      if (usage.length) {
+        ty += usageGap;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(...FOREST);
+        doc.text("How to use", textX, ty);
+        ty += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...INK);
+        for (const l of usage) {
+          doc.text(l, textX, ty);
+          ty += 4;
+        }
+      }
+      for (const l of warn) {
+        doc.text(l, textX, ty);
+        ty += 4;
       }
       y = top + blockH + 5;
     }
@@ -570,17 +600,6 @@ async function buildPatientReportPdfDoc(
 
   y = drawContactBlock(doc, model, y);
 
-  if (isFull) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...MUTED);
-    for (const line of wrapLines(doc, WELLNESS_DISCLAIMER, maxW)) {
-      y = ensureSpace(doc, model, y, 4);
-      doc.text(line, MARGIN_X, y);
-      y += 3.8;
-    }
-  }
-
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -588,7 +607,7 @@ async function buildPatientReportPdfDoc(
     drawFooter(doc, model, i, totalPages);
   }
 
-  const safeName = (model.subject.name || "screening").replace(/[^\w\-]+/g, "-").replace(/-+/g, "-");
+  const safeName = (model.headline || model.subject.name || "screening").replace(/[^\w\-]+/g, "-").replace(/-+/g, "-");
   return { doc, safeName };
 }
 
@@ -622,5 +641,5 @@ export function openPatientReportPrint(screening: Screening): void {
 }
 
 export function renderPatientReportHtml(model: PatientReportModel): string {
-  return `<pre>${model.title}\n${model.subject.name}\n${model.totalPayableLabel}</pre>`;
+  return `<pre>${model.title}\n${model.headline || model.subject.name}\n${model.totalPayableLabel}</pre>`;
 }

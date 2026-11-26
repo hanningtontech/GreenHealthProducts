@@ -11,9 +11,11 @@ import {
   REPORT_TITLE,
   REPORT_TITLE_FULL,
   sanitizePatientConclusion,
+  summarizePatientConclusion,
   SW_SUMMARY_LABEL,
   WEEK_ACTIONS_HEADING,
 } from "@/lib/reportCopy";
+import { patientFacingReportTitle } from "@/lib/patientReportTitle";
 import type { Screening, ScreeningFlag, ScreeningItem } from "@/lib/screeningTypes";
 
 export type ReportVariant = "simple" | "full";
@@ -48,13 +50,18 @@ export type ReportFinding = {
 export type PatientReportModel = {
   variant: ReportVariant;
   title: string;
+  /** Patient-facing issue heading (not the person's name). */
+  headline: string;
   reportId: string;
   preparedBy: string;
   subject: Screening["subject"];
   testDate: string;
   testTime: string;
   simpleConclusion: string;
+  /** Longer narrative for full report / PDF (no embedded product bullets). */
+  fullConclusion: string;
   simpleConclusionSw: string;
+  fullConclusionSw: string;
   swLabel: string;
   flagKey: typeof FLAG_KEY;
   weekActionsHeading: string;
@@ -96,9 +103,18 @@ function findProduct(products: Product[], code: string, productId?: string): Pro
   );
 }
 
-function plainFor(item: ScreeningItem): string {
-  if (item.followUp?.trim()) return item.followUp.trim();
-  return PLAIN_FLAG_BLURB[item.flag] || PLAIN_FLAG_BLURB.unknown;
+const PLAIN_WORDS_MAX = 200;
+
+function plainFor(item: ScreeningItem, compact = false): string {
+  let text = item.followUp?.trim()
+    ? item.followUp.trim()
+    : (PLAIN_FLAG_BLURB[item.flag] || PLAIN_FLAG_BLURB.unknown);
+  if (compact && text.length > PLAIN_WORDS_MAX) {
+    const cut = text.slice(0, PLAIN_WORDS_MAX);
+    const sp = cut.lastIndexOf(" ");
+    text = `${(sp > 0 ? cut.slice(0, sp) : cut).trim()}…`;
+  }
+  return text;
 }
 
 export function buildPatientReport(
@@ -118,13 +134,14 @@ export function buildPatientReport(
     .filter((x) => x.item.flag === "yellow" || x.item.flag === "red")
     .sort((a, b) => (a.item.flag === "red" && b.item.flag !== "red" ? -1 : a.item.flag !== "red" && b.item.flag === "red" ? 1 : 0));
 
+  const compactPlain = variant === "simple";
   const toFinding = ({ groupTitle, item }: { groupTitle: string; item: ScreeningItem }): ReportFinding => ({
     groupTitle,
     name: item.name,
     value: item.value || "—",
     normalRange: item.normalRange || "—",
     flag: item.flag,
-    plainWords: plainFor(item),
+    plainWords: plainFor(item, compactPlain),
   });
 
   const priorityFindings: ReportFinding[] = priority.map(toFinding);
@@ -166,17 +183,27 @@ export function buildPatientReport(
     .filter(Boolean)
     .slice(0, 3);
 
+  const narrativeEn = sanitizePatientConclusion(screening.simpleConclusion || "");
+  const narrativeSw = sanitizePatientConclusion(screening.simpleConclusionSw || "");
+  const shortEn = summarizePatientConclusion(narrativeEn, 320)
+    || "Your wellness screening has been reviewed. See the plan below.";
+  const shortSw = summarizePatientConclusion(narrativeSw, 320);
+  const fullEn = narrativeEn.length > shortEn.length + 24 ? narrativeEn : "";
+  const fullSw = narrativeSw.length > (shortSw || "").length + 24 ? narrativeSw : "";
+
   return {
     variant,
     title: variant === "full" ? REPORT_TITLE_FULL : REPORT_TITLE,
+    headline: patientFacingReportTitle(screening),
     reportId: screening.id,
     preparedBy: BUSINESS_CONTACT.preparedBy,
     subject: screening.subject,
     testDate: screening.subject.testDate || "—",
     testTime: screening.subject.testTime || "",
-    simpleConclusion: sanitizePatientConclusion(screening.simpleConclusion || "")
-      || "Your wellness screening has been reviewed. See the plan below.",
-    simpleConclusionSw: sanitizePatientConclusion(screening.simpleConclusionSw || ""),
+    simpleConclusion: shortEn,
+    fullConclusion: fullEn,
+    simpleConclusionSw: shortSw,
+    fullConclusionSw: fullSw,
     swLabel: SW_SUMMARY_LABEL,
     flagKey: FLAG_KEY,
     weekActionsHeading: WEEK_ACTIONS_HEADING,

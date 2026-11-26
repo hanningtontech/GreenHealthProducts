@@ -1,4 +1,5 @@
 import { listKnowledgeCases, saveKnowledgeCase } from "./knowledgeBank";
+import { isDisclaimerClosing, isMetaReplyOpening } from "./reportCopy";
 import type { KnowledgeCase } from "./screeningTypes";
 
 /** Trained starter content bank from the illustrative Person X conclusion (keywords + diseases + structure). */
@@ -15,7 +16,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyOpening: "Your screening suggests nutrition support may help.",
     replyConcerns: "Focus on balanced meals, hydration, and a general nutrient product if the package fits your needs.",
     replyRecommendationsIntro: "Product option:",
-    replyClosing: "Not a diagnosis. Follow the label and ask a clinician if symptoms are serious.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W41", productId: "w41", name: "Super Nutrition", rank: 1,
@@ -41,18 +42,22 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
   {
     id: "seed-digestive",
     title: "Digestive discomfort",
-    triggersEn: ["digestive", "digestion", "intestine", "bowel", "stomach", "diarrhea", "diarrhoea", "loose stool", "bad stomach"],
-    triggersSw: ["mmeng'enyo", "tumbo", "utumbo", "kuhara", "choo laini"],
-    keywords: ["digestive wellness", "intestinal comfort", "yellow digestive", "diarrhea", "stomach pain"],
+    qualityFlag: "diamond",
+    triggersEn: [
+      "digestive", "digestion", "intestine", "bowel", "stomach", "diarrhea", "diarrhoea",
+      "loose stool", "bad stomach", "upset stomach", "tummy upset", "mild diarrhea", "runny stool",
+    ],
+    triggersSw: ["mmeng'enyo", "tumbo", "utumbo", "kuhara", "choo laini", "tumbo linaniuma", "ninaumwa tumbo"],
+    keywords: ["digestive wellness", "intestinal comfort", "yellow digestive", "diarrhea", "stomach pain", "tummy"],
     diseases: ["digestive imbalance (screening flag)", "poor intestinal comfort", "diarrhea (symptom report)"],
     summary:
       "Mild digestive imbalance flags may pair with digestive-wellness drinks or teas, introduced carefully and not as disease treatment.",
     summarySw:
       "Asante kwa kushiriki. Umeripoti usumbufu wa tumbo au kuhara. Jadili milo, maji, na utaratibu wa siku. Vinywaji vya ustawi wa mmeng'enyo vinaweza kuzingatiwa — si tiba ya ugonjwa wa tumbo.",
-    replyOpening: "Digestive comfort came up in the matched content.",
-    replyConcerns: "Discuss routine, meals, and hydration. A digestive wellness drink or tea may be considered.",
+    replyOpening: "Thank you for sharing your digestive symptoms with us.",
+    replyConcerns: "Discuss routine, meals, and hydration. A digestive wellness drink or tea may be considered. Seek care for blood in stool, high fever, or severe pain.",
     replyRecommendationsIntro: "Product option:",
-    replyClosing: "This is wellness support, not treatment for digestive disease.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W51", productId: "w51", name: "Fresh Drink Clear", rank: 1,
@@ -79,15 +84,19 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
   {
     id: "seed-energy",
     title: "Low energy and protein gaps",
-    triggersEn: ["energy", "fatigue", "tiredness", "low energy", "protein"],
-    triggersSw: ["uchovu", "nguvu", "proteini"],
-    keywords: ["tired", "fatigue flag", "reduced energy"],
+    qualityFlag: "diamond",
+    triggersEn: [
+      "energy", "fatigue", "tiredness", "low energy", "protein", "always tired",
+      "no energy", "protein gaps", "barely eat protein", "worn out",
+    ],
+    triggersSw: ["uchovu", "nguvu", "proteini", "nina uchovu", "sina nguvu"],
+    keywords: ["tired", "fatigue flag", "reduced energy", "low protein diet"],
     diseases: ["fatigue (screening flag)", "low energy"],
     summary: "Tiredness with dietary gaps may suggest protein and nutrition support alongside rest and meals.",
-    replyOpening: "Low energy was matched in the content bank.",
-    replyConcerns: "Rest, meals, and protein support can be discussed when diet protein looks low.",
+    replyOpening: "Thank you for noting tiredness and low energy on your screening.",
+    replyConcerns: "Rest, meals, and protein support can be discussed when diet protein looks low. Seek clinical review for breathlessness, chest pain, or sudden weakness.",
     replyRecommendationsIntro: "Product option:",
-    replyClosing: "Not a medical diagnosis of fatigue causes.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W14", productId: "w14", name: "Protein Powder", rank: 1,
@@ -104,12 +113,16 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
   {
     id: "seed-stress-sleep",
     title: "Stress and tiredness",
-    triggersEn: ["stress", "sleep", "poor sleep", "fatigue"],
-    triggersSw: ["msongo", "usingizi"],
-    keywords: ["inadequate sleep", "stress flag"],
+    qualityFlag: "diamond",
+    triggersEn: [
+      "stress", "sleep", "poor sleep", "tired from stress", "worried", "can't sleep",
+      "overwhelmed", "burned out", "stress and tiredness",
+    ],
+    triggersSw: ["msongo", "usingizi", "nina msongo", "sijalala vizuri"],
+    keywords: ["inadequate sleep", "stress flag", "daily stress", "wind-down"],
     diseases: ["stress (screening flag)", "poor sleep"],
     summary: "Stress or inadequate sleep flags suggest lifestyle review first; no default coffee or fish-oil product.",
-    replyOpening: "Stress or sleep concerns matched approved bank content.",
+    replyOpening: "Thank you for sharing how stress and sleep have been affecting you.",
     replyConcerns: "Review sleep habits and daily load first. Track caffeine timing, wind-down routine, and whether worry peaks at night. Seek professional help for severe anxiety, lasting insomnia, or depression symptoms.",
     replyRecommendationsIntro: "",
     replyClosing: "Seek professional help for severe anxiety, insomnia, or depression symptoms.",
@@ -124,7 +137,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     keywords: ["vascular", "lipid flag"],
     diseases: ["circulation wellness flag", "cholesterol software flag"],
     summary: "Circulation-related software flags may pair with omega-3 nutrition discussion and clinical confirmation if needed.",
-    replyOpening: "Circulation-related flags matched the content bank.",
+    replyOpening: "Your screening highlighted circulation-related wellness items we can review with you.",
     replyConcerns: "Discuss activity, hydration, and diet. Confirm clinically if needed — this is not a lipid diagnosis.",
     replyRecommendationsIntro: "Product option:",
     replyClosing: "Lab tests are different from analyzer software bands.",
@@ -149,10 +162,10 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     keywords: ["bone-support flag", "D3"],
     diseases: ["vitamin D flag", "bone support flag"],
     summary: "Vitamin D or bone-support flags suggest label-confirmed vitamin D or calcium options after diet review.",
-    replyOpening: "Vitamin D / bone support matched the bank.",
+    replyOpening: "Your screening noted vitamin D or bone-support areas worth discussing.",
     replyConcerns: "Consider diet review and a label-confirmed vitamin D or calcium option if appropriate.",
     replyRecommendationsIntro: "Bone/nutrition options:",
-    replyClosing: "Not a diagnosis of bone disease. Confirm with a clinician when needed.",
+    replyClosing: "",
     recommendations: [
       { code: "W59", productId: "w59", name: "Vitamin D3 Capsule", concern: "Vitamin D or bone-support flag", role: "Vitamin D support" },
       { code: "W16", productId: "w16", name: "Calcium Tablet for Adults", concern: "Vitamin D or bone-support flag", role: "Calcium support" },
@@ -197,13 +210,13 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Your note links stomach symptoms with marked weakness. Those can travel together or need separate attention. Useful next steps for your record: keep prior test results and a list of medicines or supplements ready; note where the pain sits, when it comes, appetite, stool colour, fever, bruising or bleeding, and how energy changes through the day. Gentle rest, small meals if you can manage them, and steady fluids if tolerated can support comfort while your plan is reviewed. Pause starting new iron, B12, folate, herbal, detox, or “blood-building” products on your own until the picture is clearer — some can clash with other care or confuse later results. Prefer simple pain options only if already part of your usual routine; avoid stacking several new supplements at once.",
     replyRecommendationsIntro: "Product plan for this case:",
-    replyClosing:
-      "Wellness information only — not a diagnosis or treatment. Follow current package labels if any product is later added to your plan.",
+    replyClosing: "",
     recommendations: [],
   },
   {
     id: "seed-migraine-light-sensitivity",
     title: "Migraine-like pain / light sensitivity",
+    qualityFlag: "diamond",
     triggersEn: [
       "migraine",
       "migraine-like",
@@ -212,6 +225,8 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
       "photophobia",
       "headache",
       "head & mind",
+      "throbbing headache",
+      "sensitive to light",
     ],
     triggersSw: [
       "migraine",
@@ -220,6 +235,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
       "mwanga unanisumbua",
       "kichwa kinaniuma",
       "kichwa na akili",
+      "kichwa kinaniuma na mwanga",
     ],
     keywords: [
       "Migraine-like pain / light sensitivity",
@@ -227,6 +243,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
       "nausea with headache",
       "vision changes with headache",
       "dim room",
+      "recurring headache",
     ],
     diseases: [
       "headache with light sensitivity",
@@ -242,8 +259,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Note when the pain starts, how long it lasts, and whether nausea, vision changes, or dizziness occur at the same time. Rest in a quiet, dim room if it helps. Seek emergency care for a sudden, extremely severe headache or a headache with new weakness, trouble speaking, vision loss, confusion, or fever with a stiff neck. Source: www.nhs.uk",
     replyRecommendationsIntro: "Product option:",
-    replyClosing:
-      "Products are wellness-support options only — not a diagnosis or treatment. Follow package labels and seek a clinician for serious or urgent symptoms.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W38",
@@ -264,16 +280,20 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     id: "seed-reflux-heartburn",
     title: "Heartburn / reflux-style discomfort",
     conditionTitle: "Heartburn / reflux-style discomfort",
-    triggersEn: ["heartburn", "reflux", "acid after lying", "sour taste", "gastric"],
-    triggersSw: ["kiungulia", "asidi", "tumbo la juu"],
-    keywords: ["lying down heartburn", "spicy dinner burning"],
+    qualityFlag: "diamond",
+    triggersEn: [
+      "heartburn", "reflux", "acid after lying", "sour taste", "gastric",
+      "burning chest after meals", "acid taste", "upper stomach burning",
+    ],
+    triggersSw: ["kiungulia", "asidi", "tumbo la juu", "nina kiungulia"],
+    keywords: ["lying down heartburn", "spicy dinner burning", "after meals burning"],
     diseases: ["heartburn (symptom report)", "reflux-style discomfort"],
     summary: "Heartburn after meals or lying down — meal timing, elevation, and clinician review if persistent; gastric tablet only when fit is clear.",
     summarySw: "Kiungulia baada ya milo au kulala — muda wa milo, kuinua kichwa, na mapitio ya daktari ikiwa inaendelea.",
     replyOpening: "Thank you for sharing your heartburn or upper-stomach burning note.",
     replyConcerns: "Track triggers (spicy or late meals, lying flat soon after eating). Elevate the head of the bed if nights are worse. Arrange clinical review if pain is severe, you vomit blood, or swallowing becomes hard.",
     replyRecommendationsIntro: "Product option:",
-    replyClosing: "Wellness information only — not a diagnosis of ulcer or reflux disease.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W71", productId: "w71", name: "Gastric Health Tablet", rank: 1,
@@ -326,8 +346,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Sit or lie down when it happens, get up slowly, and avoid driving while dizzy. Write down whether the room spins or you feel as though you might faint, and whether it starts when you stand up. See a clinician if it persists or keeps returning. If you also have headaches, note whether they happen together and arrange a clinician review if they recur. Source: www.nhs.uk",
     replyRecommendationsIntro: "Product options to discuss for this case:",
-    replyClosing:
-      "Products are wellness-support options only — not a diagnosis or treatment. Follow package labels and seek a clinician for serious or urgent symptoms.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W26",
@@ -377,8 +396,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Track how long it lasts and whether it affects your sleep, appetite, or daily activities. Talk to a clinician if it lasts two weeks or is already making daily life difficult. Seek urgent help if you have thoughts of harming yourself, and seek emergency help now if you feel unable to stay safe. Source: www.nhs.uk",
     replyRecommendationsIntro: "Product options to discuss for this case:",
-    replyClosing:
-      "Products are wellness-support options only — not a diagnosis or treatment. Follow package labels and seek a clinician for serious or urgent symptoms. Arrange care for persistent low mood.",
+    replyClosing: "",
     emptyProductReason: "Persistent low mood needs clinician-led care first; omega-3 is not a default mood product.",
     recommendations: [],
   },
@@ -416,8 +434,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Track readings if you already monitor at home, keep meals regular, and bring your log to a clinician. Wellness products are not a substitute for prescribed diabetes care.",
     replyRecommendationsIntro: "Optional products to discuss with your clinician:",
-    replyClosing:
-      "Not a diagnosis or treatment plan. Follow package labels and prescribed care.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W42",
@@ -461,8 +478,7 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Keep a written log of cuff readings (date, time, value). Sit quietly before measuring. Arrange clinician review for readings that stay high. Seek emergency care now if you also have chest pain, sudden severe headache, weakness, or trouble speaking.",
     replyRecommendationsIntro: "Routine wellness products are secondary to blood-pressure medical review:",
-    replyClosing:
-      "Wellness information only — not a hypertension diagnosis or treatment.",
+    replyClosing: "",
     recommendations: [
       {
         code: "W19",
@@ -500,23 +516,32 @@ export const SEED_KNOWLEDGE_CASES: KnowledgeCase[] = [
     replyConcerns:
       "Sudden severe headache with slurred speech or trouble speaking can signal a medical emergency. Call emergency services or go to the nearest emergency department now.",
     replyRecommendationsIntro: "",
-    replyClosing:
-      "Do not wait for wellness products or a routine plan.",
+    replyClosing: "",
     recommendations: [],
   },
 ];
 
 function withSeedRetrievalGates(seed: KnowledgeCase): KnowledgeCase {
+  const flag = seed.qualityFlag || "green";
   return {
     ...seed,
     conditionTitle: seed.conditionTitle || seed.title,
     reviewStatus: "approved",
     active: true,
-    qualityFlag: seed.qualityFlag || "green",
+    qualityFlag: flag,
+    autoHitCount: seed.autoHitCount || 0,
   };
 }
 
-export async function ensureSeedKnowledgeBank(): Promise<{ added: number; updated: number }> {
+/**
+ * Ensure starter bank cases exist.
+ * Default (automatic): only add missing seeds; lightly promote diamond flag when needed.
+ * Manual fallback: pass `{ forceRefresh: true }` to overwrite seed content from templates.
+ */
+export async function ensureSeedKnowledgeBank(
+  options?: { forceRefresh?: boolean },
+): Promise<{ added: number; updated: number }> {
+  const forceRefresh = Boolean(options?.forceRefresh);
   const existing = await listKnowledgeCases();
   const have = new Map(existing.map((item) => [item.id, item]));
   let added = 0;
@@ -529,15 +554,42 @@ export async function ensureSeedKnowledgeBank(): Promise<{ added: number; update
       added += 1;
       continue;
     }
-    // Refresh trained seed copy so admin Seed bank picks up improved answers.
-    await saveKnowledgeCase({
-      ...next,
-      createdAt: prior.createdAt,
-      approvedAt: prior.approvedAt,
-      sourceScreeningId: prior.sourceScreeningId,
-      sourceIntakeId: prior.sourceIntakeId,
-    });
-    updated += 1;
+    if (forceRefresh) {
+      await saveKnowledgeCase({
+        ...next,
+        createdAt: prior.createdAt,
+        approvedAt: prior.approvedAt,
+        sourceScreeningId: prior.sourceScreeningId,
+        sourceIntakeId: prior.sourceIntakeId,
+        autoHitCount: prior.autoHitCount || 0,
+        pendingEnrich: prior.pendingEnrich,
+      });
+      updated += 1;
+      continue;
+    }
+    // Soft auto path: never wipe curated replies — only lift to diamond when the seed is diamond,
+    // clear disclaimer-style replyClosing, and replace meta replyOpening from live bank docs.
+    const priorClosing = String(prior.replyClosing || "").trim();
+    const clearClosing = isDisclaimerClosing(priorClosing);
+    const clearOpening = isMetaReplyOpening(prior.replyOpening || "");
+    const seedOpening = String(next.replyOpening || "").trim();
+    const promoteDiamond = next.qualityFlag === "diamond" && prior.qualityFlag !== "diamond";
+    if (promoteDiamond || clearClosing || clearOpening) {
+      await saveKnowledgeCase({
+        ...prior,
+        ...(promoteDiamond
+          ? {
+            qualityFlag: "diamond" as const,
+            reviewStatus: "approved" as const,
+            active: true,
+            approvedAt: prior.approvedAt || Date.now(),
+          }
+          : {}),
+        ...(clearClosing ? { replyClosing: "" } : {}),
+        ...(clearOpening && seedOpening ? { replyOpening: seedOpening } : clearOpening ? { replyOpening: "" } : {}),
+      });
+      updated += 1;
+    }
   }
   return { added, updated };
 }

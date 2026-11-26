@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Camera, HelpCircle, LogOut, Menu, MessageCircleHeart, Pencil, Store, UserRound, X } from "lucide-react";
+import { Camera, MessageCircleHeart, Pencil, UserRound } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import BrandMark from "@/components/BrandMark";
 import ProfilePhotoCropper from "@/components/ProfilePhotoCropper";
+import SiteNavActions from "@/components/SiteNavActions";
 import { initialsFromName } from "@/lib/patientAvatar";
 import { isDisplayableMediaUrl, resolveMediaUrl } from "@/lib/mediaStorage";
 import { uploadProfilePhoto } from "@/lib/profilePhoto";
@@ -45,7 +46,6 @@ export default function Profile() {
   } = useAuthContext();
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [editing, setEditing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -54,7 +54,6 @@ export default function Profile() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
 
   const revokeObjectUrl = () => {
@@ -104,17 +103,6 @@ export default function Profile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only rehydrate when profile/user identity changes
   }, [user?.uid, profile?.uid, profile?.updatedAt]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointer = (event: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
-  }, [menuOpen]);
-
   useEffect(() => () => revokeObjectUrl(), []);
 
   const authSubmit = async (event: React.FormEvent) => {
@@ -155,6 +143,14 @@ export default function Profile() {
   const profileSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
+    if (!String(draft.age || "").trim()) {
+      setError("Age is required.");
+      return;
+    }
+    if (!String(draft.sex || "").trim()) {
+      setError("Sex is required.");
+      return;
+    }
     setBusy(true);
     setError("");
     setMessage("");
@@ -242,50 +238,22 @@ export default function Profile() {
   return (
     <div className="admin-shell">
       <header className="admin-header profile-header">
-        <div>
-          <Link href="/" className="brand">
-            <BrandMark />
-            <span>GreenHealth<em>Products</em></span>
-          </Link>
-          <p className="admin-kicker">Your profile</p>
-        </div>
-
-        <div className="profile-header-menu" ref={menuRef}>
-          <button
-            type="button"
-            className="icon-button profile-menu-spin"
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X size={21} /> : <Menu size={21} />}
-          </button>
-          {menuOpen && (
-            <div className="profile-menu-panel" role="menu">
-              <Link href="/" className="profile-menu-item" role="menuitem" onClick={() => setMenuOpen(false)}>
-                <Store size={18} />
-                <span>Store</span>
-              </Link>
-              <Link href="/help" className="profile-menu-item" role="menuitem" onClick={() => setMenuOpen(false)}>
-                <HelpCircle size={18} />
-                <span>Get help</span>
-              </Link>
-              {user && (
-                <button
-                  type="button"
-                  className="profile-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void signOut();
-                  }}
-                >
-                  <LogOut size={18} />
-                  <span>Sign out</span>
-                </button>
-              )}
-            </div>
-          )}
+        <div className="admin-header-bar">
+          <div>
+            <Link href="/" className="brand">
+              <BrandMark />
+              <span>GreenHealth<em>Products</em></span>
+            </Link>
+            <p className="admin-kicker">Your profile</p>
+          </div>
+          <SiteNavActions
+            variant="patient"
+            menuItems={[
+              { href: "/", label: "Store", icon: "store" },
+              { href: "/help", label: "Get help", icon: "help" },
+              { href: "/results", label: "My results", icon: "results" },
+            ]}
+          />
         </div>
       </header>
 
@@ -294,7 +262,7 @@ export default function Profile() {
           <section className="auth-panel">
             <p className="eyebrow">Your account</p>
             <h1>{mode === "register" ? "Create an account" : "Sign in"}</h1>
-            <p>Continue with Google or email. You can finish age, photo, and details later — nothing autosaves.</p>
+            <p>Continue with Google or email. Age and sex are required before automatic guidance — nothing autosaves.</p>
             <button
               type="button"
               className="button button-secondary auth-google-btn"
@@ -402,10 +370,10 @@ export default function Profile() {
             <form className="auth-form" onSubmit={profileSubmit}>
               <label className="form-field"><span>Display name</span><input value={draft.displayName} onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))} required /></label>
               <div className="profile-field-row">
-                <label className="form-field"><span>Age</span><input type="number" min={1} max={120} inputMode="numeric" value={draft.age} onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))} placeholder="Optional" /></label>
-                <label className="form-field"><span>Sex</span>
-                  <select value={draft.sex} onChange={(e) => setDraft((d) => ({ ...d, sex: e.target.value }))}>
-                    <option value="">Prefer not to say</option>
+                <label className="form-field"><span>Age *</span><input type="number" min={1} max={120} inputMode="numeric" value={draft.age} onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))} placeholder="Required" required /></label>
+                <label className="form-field"><span>Sex *</span>
+                  <select value={draft.sex} onChange={(e) => setDraft((d) => ({ ...d, sex: e.target.value }))} required>
+                    <option value="">Select…</option>
                     <option value="Female">Female</option>
                     <option value="Male">Male</option>
                     <option value="Other">Other</option>

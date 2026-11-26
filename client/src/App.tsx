@@ -12,6 +12,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { bindKnowledgeBankSyncListeners } from "@/lib/knowledgeBank";
+import { ensureSeedKnowledgeBank } from "@/lib/seedKnowledge";
 
 function Router() {
   return <Switch>
@@ -28,6 +29,9 @@ function Router() {
 export default function App() {
   useEffect(() => {
     bindKnowledgeBankSyncListeners();
+    void ensureSeedKnowledgeBank().catch((err) => {
+      console.warn("Automatic content-bank seed skipped", err);
+    });
   }, []);
 
   return (

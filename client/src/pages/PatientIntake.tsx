@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import ButtonBusyMark from "@/components/ButtonBusyMark";
 import {
   Bone,
   Brain,
@@ -13,14 +14,10 @@ import {
   Heart,
   Leaf,
   List,
-  LogOut,
-  Menu,
   PersonStanding,
   Ribbon,
   Search,
   Shield,
-  ShieldCheck,
-  Store,
   Trash2,
   UserRound,
   Utensils,
@@ -30,9 +27,12 @@ import {
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import BrandMark from "@/components/BrandMark";
+import ListPager from "@/components/ListPager";
+import SiteNavActions from "@/components/SiteNavActions";
+import { PAGE_SIZE_DEFAULT, pageCount, slicePage } from "@/lib/listPaging";
 import { findPatientByAuthUid } from "@/lib/patients";
 import { deleteIntake, listIntakesForUser, newIntakeId, saveIntake } from "@/lib/intakes";
-import { ensureScreeningDraftFromIntake } from "@/lib/intakeToScreening";
+import { processHelpInquiry } from "@/lib/processHelpInquiry";
 import {
   buildIntakeTitleSummary,
   detectIntakeSource,
@@ -47,7 +47,17 @@ import {
   type HelpCategory,
   type HelpSymptom,
 } from "@/lib/helpSymptoms";
-import { WELLNESS_DISCLAIMER, type Intake } from "@/lib/screeningTypes";
+import { readHelpPrefill } from "@/lib/assistStoreSearchClient";
+import { patientFacingReportTitle, pulseDevice } from "@/lib/patientReportTitle";
+import { subscribeSharedScreeningsForPatient } from "@/lib/screenings";
+import type { Intake } from "@/lib/screeningTypes";
+
+type ReportWaitState = {
+  intakeId: string;
+  screeningId?: string;
+  status: "waiting" | "ready";
+  title: string;
+};
 
 const ICON_MAP: Record<HelpCategory["icon"], LucideIcon> = {
   brain: Brain,
@@ -70,7 +80,8 @@ const ICON_MAP: Record<HelpCategory["icon"], LucideIcon> = {
 type SubmitMode = "note" | "categories";
 
 export default function PatientIntake() {
-  const { user, profile, loading, signOut } = useAuthContext();
+  const { user, profile, loading } = useAuthContext();
+  const [, setLocation] = useLocation();
   const [language, setLanguage] = useState<"en" | "sw">("en");
   const [concerns, setConcerns] = useState<string[]>([]);
   const [freeText, setFreeText] = useState("");
@@ -78,13 +89,15 @@ export default function PatientIntake() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [categoryVisibleCount, setCategoryVisibleCount] = useState(5);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [historyQuery, setHistoryQuery] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [reportWait, setReportWait] = useState<ReportWaitState | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyRef = useRef<HTMLElement | null>(null);
 
   const activeCategory = useMemo(
     () => HELP_CATEGORIES.find((item) => item.id === activeCategoryId) || null,
@@ -104,21 +117,68 @@ export default function PatientIntake() {
       ].join(" ").toLowerCase().includes(q));
   }, [mine, historyQuery]);
 
+  const historyTotalPages = pageCount(filteredMine.length, PAGE_SIZE_DEFAULT);
+  const pagedMine = useMemo(
+    () => slicePage(filteredMine, historyPage, PAGE_SIZE_DEFAULT),
+    [filteredMine, historyPage],
+  );
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historyQuery]);
+
   useEffect(() => {
     if (!user) return;
     void listIntakesForUser(user.uid).then(setMine);
   }, [user]);
 
   useEffect(() => {
-    if (!menuOpen) return;
-    const onPointer = (event: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
+    const prefill = readHelpPrefill();
+    if (!prefill) return;
+    setFreeText(prefill);
+    const t = window.setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!reportWait || reportWait.status !== "waiting" || !user) return;
+    let cancelled = false;
+    let unsub: (() => void) | undefined;
+    void (async () => {
+      const patient = await findPatientByAuthUid(user.uid);
+      if (!patient || cancelled) return;
+      unsub = subscribeSharedScreeningsForPatient(patient.id, (list) => {
+        const hit = list.find((item) =>
+          (reportWait.screeningId && item.id === reportWait.screeningId)
+          || item.sourceIntakeId === reportWait.intakeId
+        );
+        if (!hit || hit.status !== "shared") return;
+        pulseDevice([40, 70, 40, 70, 80]);
+        setReportWait({
+          intakeId: reportWait.intakeId,
+          screeningId: hit.id,
+          status: "ready",
+          title: patientFacingReportTitle(hit),
+        });
+        void listIntakesForUser(user.uid).then(setMine);
+      });
+    })();
+    return () => {
+      cancelled = true;
+      unsub?.();
     };
-    document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
-  }, [menuOpen]);
+  }, [reportWait, user]);
+
+  useEffect(() => {
+    if (reportWait?.status !== "ready") return;
+    const t = window.setTimeout(() => {
+      historyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [reportWait?.status]);
 
   useEffect(() => {
     if (!activeCategoryId) return;
@@ -164,8 +224,33 @@ export default function PatientIntake() {
   const selectedCountFor = (category: HelpCategory) =>
     category.symptoms.filter((symptom) => isSymptomSelected(category, symptom)).length;
 
+  const sortedCategories = useMemo(() => {
+    const order = new Map(HELP_CATEGORIES.map((cat, index) => [cat.id, index]));
+    return [...HELP_CATEGORIES].sort((a, b) => {
+      const countA = selectedCountFor(a);
+      const countB = selectedCountFor(b);
+      const picksA = countA > 0 ? 1 : 0;
+      const picksB = countB > 0 ? 1 : 0;
+      if (picksB !== picksA) return picksB - picksA;
+      if (countB !== countA) return countB - countA;
+      return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
+    });
+  }, [concerns, language]);
+
+  /** Same grid layout: start at 5, Show more adds the next 5 in place (page scrolls — no inner box). */
+  const visibleCategories = sortedCategories.slice(0, categoryVisibleCount);
+  const canShowMoreCategories = categoryVisibleCount < sortedCategories.length;
+  const canShowLessCategories = categoryVisibleCount > 5;
+  const showCategoryGridToggle = canShowMoreCategories || canShowLessCategories;
+
   const submit = async (mode: SubmitMode) => {
     if (!user) return;
+    if (!String(profile?.age || "").trim() || !String(profile?.sex || "").trim()) {
+      setError(language === "sw"
+        ? "Kamilisha umri na jinsia kwenye Wasifu yako kwanza."
+        : "Add your age and sex in Profile first so we can prepare your guidance.");
+      return;
+    }
     const noteText = mode === "note" ? freeText.trim() : "";
     const selected = mode === "categories" ? concerns : (mode === "note" ? [] : concerns);
     const payloadConcerns = mode === "note" ? [] : selected;
@@ -208,11 +293,29 @@ export default function PatientIntake() {
         status: "pending",
       };
       await saveIntake(intake);
+      let autoShared = false;
+      let wait: ReportWaitState = {
+        intakeId: intake.id,
+        status: "waiting",
+        title: title || summary || (language === "sw" ? "Ripoti yako" : "Your report"),
+      };
       try {
-        await ensureScreeningDraftFromIntake(intake);
-      } catch (draftErr) {
-        console.warn("Help intake saved, but screening draft failed:", draftErr);
+        const processed = await processHelpInquiry({
+          intake,
+          authUid: user.uid,
+        });
+        autoShared = processed.diamondShared;
+        wait = {
+          intakeId: intake.id,
+          screeningId: processed.screening.id,
+          status: autoShared ? "ready" : "waiting",
+          title: patientFacingReportTitle(processed.screening) || wait.title,
+        };
+        if (autoShared) pulseDevice([40, 70, 40, 70, 80]);
+      } catch (processErr) {
+        console.warn("Help intake saved, but auto-match failed:", processErr);
       }
+      setReportWait(wait);
       setMine(await listIntakesForUser(user.uid));
       if (mode === "note") setFreeText("");
       if (mode === "categories") {
@@ -220,9 +323,13 @@ export default function PatientIntake() {
         setCategoriesOpen(false);
       }
       setNote(
-        language === "sw"
-          ? "Imetumwa. Tutakagua na kukushirikisha ripoti kwenye Matokeo yangu."
-          : "Sent. We’ll review and share your report under My results when ready.",
+        autoShared
+          ? (language === "sw"
+            ? "Imetumwa. Mwongozo uko tayari — angalia ripoti yako."
+            : "Sent. Guidance is ready — open your report.")
+          : (language === "sw"
+            ? "Imetumwa. Tunatayarisha ripoti yako…"
+            : "Sent. Preparing your report…"),
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not submit";
@@ -249,44 +356,15 @@ export default function PatientIntake() {
     }
   };
 
-  const menu = (
-    <div className="profile-header-menu help-header-menu" ref={menuRef}>
-      <button
-        type="button"
-        className="icon-button profile-menu-spin"
-        aria-label={menuOpen ? "Close menu" : "Open menu"}
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((open) => !open)}
-      >
-        {menuOpen ? <X size={21} /> : <Menu size={21} />}
-      </button>
-      {menuOpen && (
-        <div className="profile-menu-panel" role="menu">
-          <Link href="/" className="profile-menu-item" role="menuitem" onClick={() => setMenuOpen(false)}>
-            <Store size={18} /><span>{language === "sw" ? "Duka" : "Store"}</span>
-          </Link>
-          <Link href="/profile" className="profile-menu-item" role="menuitem" onClick={() => setMenuOpen(false)}>
-            <UserRound size={18} /><span>{language === "sw" ? "Wasifu" : "My profile"}</span>
-          </Link>
-          <Link href="/results" className="profile-menu-item" role="menuitem" onClick={() => setMenuOpen(false)}>
-            <ClipboardList size={18} /><span>{language === "sw" ? "Matokeo" : "My results"}</span>
-          </Link>
-          {user && (
-            <button
-              type="button"
-              className="profile-menu-item"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                void signOut();
-              }}
-            >
-              <LogOut size={18} /><span>{language === "sw" ? "Toka" : "Sign out"}</span>
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+  const patientNav = (
+    <SiteNavActions
+      variant="patient"
+      menuItems={[
+        { href: "/", label: language === "sw" ? "Duka" : "Store", icon: "store" },
+        { href: "/profile", label: language === "sw" ? "Wasifu" : "My profile", icon: "profile" },
+        { href: "/results", label: language === "sw" ? "Matokeo" : "My results", icon: "results" },
+      ]}
+    />
   );
 
   if (loading) {
@@ -297,11 +375,13 @@ export default function PatientIntake() {
     return (
       <div className="admin-shell">
         <header className="admin-header profile-header">
-          <div>
-            <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
-            <p className="admin-kicker">Get help</p>
+          <div className="admin-header-bar">
+            <div>
+              <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
+              <p className="admin-kicker">Get help</p>
+            </div>
+            {patientNav}
           </div>
-          {menu}
         </header>
         <main className="container admin-main">
           <section className="auth-panel help-gate">
@@ -320,11 +400,13 @@ export default function PatientIntake() {
   return (
     <div className="admin-shell">
       <header className="admin-header profile-header">
-        <div>
-          <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
-          <p className="admin-kicker">Get help</p>
+        <div className="admin-header-bar">
+          <div>
+            <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
+            <p className="admin-kicker">Get help</p>
+          </div>
+          {patientNav}
         </div>
-        {menu}
       </header>
 
       <main className="container admin-main help-main">
@@ -387,31 +469,57 @@ export default function PatientIntake() {
 
               {categoriesOpen && (
                 <div className="help-categories-body">
-                  <div className="help-category-grid" role="list">
-                    {HELP_CATEGORIES.map((category) => {
-                      const Icon = ICON_MAP[category.icon];
-                      const count = selectedCountFor(category);
-                      return (
-                        <button
-                          key={category.id}
-                          type="button"
-                          className={`help-category-card ${count ? "has-picks" : ""}`}
-                          onClick={() => setActiveCategoryId(category.id)}
-                        >
-                          <span className="help-category-icon"><Icon size={20} /></span>
-                          <span className="help-category-copy">
-                            <b>{language === "sw" ? category.labelSw : category.labelEn}</b>
-                            <small>
-                              {count
-                                ? (language === "sw" ? `${count} yamechaguliwa` : `${count} selected`)
-                                : (language === "sw" ? "Fungua chaguo" : "Open options")}
-                            </small>
-                          </span>
-                          {count > 0 && <span className="help-category-count">{count}</span>}
-                        </button>
-                      );
-                    })}
+                  <div className={`help-category-grid-wrap ${canShowMoreCategories ? "has-fade" : ""}`}>
+                    <div className="help-category-grid" role="list">
+                      {visibleCategories.map((category) => {
+                        const Icon = ICON_MAP[category.icon];
+                        const count = selectedCountFor(category);
+                        return (
+                          <button
+                            key={category.id}
+                            type="button"
+                            className={`help-category-card ${count ? "has-picks" : ""}`}
+                            onClick={() => setActiveCategoryId(category.id)}
+                          >
+                            <span className="help-category-icon"><Icon size={20} /></span>
+                            <span className="help-category-copy">
+                              <b>{language === "sw" ? category.labelSw : category.labelEn}</b>
+                              <small>
+                                {count
+                                  ? (language === "sw" ? `${count} yamechaguliwa` : `${count} selected`)
+                                  : (language === "sw" ? "Fungua chaguo" : "Open options")}
+                              </small>
+                            </span>
+                            {count > 0 && <span className="help-category-count">{count}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {canShowMoreCategories && <div className="help-category-grid-fade" aria-hidden />}
                   </div>
+
+                  {showCategoryGridToggle && (
+                    <div className="help-categories-show-more-row">
+                      {canShowMoreCategories && (
+                        <button
+                          type="button"
+                          className="help-categories-show-more text-link"
+                          onClick={() => setCategoryVisibleCount((n) => Math.min(n + 5, sortedCategories.length))}
+                        >
+                          {language === "sw" ? "Onyesha zaidi" : "Show more"}
+                        </button>
+                      )}
+                      {canShowLessCategories && (
+                        <button
+                          type="button"
+                          className="help-categories-show-more text-link"
+                          onClick={() => setCategoryVisibleCount(5)}
+                        >
+                          {language === "sw" ? "Onyesha kidogo" : "Show less"}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {concerns.length > 0 && (
                     <div className="help-selected">
@@ -450,13 +558,9 @@ export default function PatientIntake() {
             {note && <p className="sync-note">{note}</p>}
           </div>
 
-          <div className="notice help-disclaimer">
-            <ShieldCheck size={17} />
-            <span>{WELLNESS_DISCLAIMER}</span>
-          </div>
         </section>
 
-        <section className="help-history">
+        <section className="help-history" ref={historyRef}>
           <p className="eyebrow">{language === "sw" ? "Uliotuma" : "Your submissions"}</p>
           <div className="help-history-search">
             <Search size={16} />
@@ -466,7 +570,7 @@ export default function PatientIntake() {
               placeholder={language === "sw" ? "Tafuta ulichotuma…" : "Search what you sent…"}
             />
           </div>
-          {filteredMine.map((item) => {
+          {pagedMine.map((item) => {
             const open = expandedId === item.id;
             return (
               <article key={item.id} className={`help-history-card ${open ? "is-open" : ""}`}>
@@ -521,8 +625,64 @@ export default function PatientIntake() {
                 : (language === "sw" ? "Bado hakuna maombi." : "No submissions yet.")}
             </p>
           )}
+          {filteredMine.length > 0 && (
+            <ListPager
+              page={historyPage}
+              totalPages={historyTotalPages}
+              onPageChange={setHistoryPage}
+              prevLabel={language === "sw" ? "Iliyotangulia" : "Previous"}
+              nextLabel={language === "sw" ? "Ifuatayo" : "Next"}
+            />
+          )}
         </section>
       </main>
+
+      {reportWait && (
+        <div className="modal-backdrop help-report-wait" role="dialog" aria-modal="true" aria-live="polite">
+          <div className="help-report-wait-card" onClick={(e) => e.stopPropagation()}>
+            {reportWait.status === "waiting" ? (
+              <>
+                <ButtonBusyMark size={28} />
+                <div>
+                  <h3>{language === "sw" ? "Inasubiri ripoti…" : "Waiting for your report…"}</h3>
+                  <p>
+                    {language === "sw"
+                      ? "Tumepokea maelezo yako. Tutakushirikisha ripoti hapa na kwenye Matokeo yangu iko tayari."
+                      : "We’ve received your note. Your report will appear here and under My results when it’s ready."}
+                  </p>
+                  <p className="muted" style={{ marginTop: 8 }}>{reportWait.title}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <ClipboardList size={28} />
+                <div>
+                  <h3>{language === "sw" ? "Ripoti iko tayari" : "Your report is ready"}</h3>
+                  <p>{reportWait.title}</p>
+                  <div className="nav-search-confirm-actions" style={{ marginTop: 14 }}>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => {
+                        const href = reportWait.screeningId
+                          ? `/results/${reportWait.screeningId}`
+                          : "/results";
+                        setReportWait(null);
+                        setLocation(href);
+                      }}
+                    >
+                      {language === "sw" ? "Fungua ripoti" : "Open report"}
+                    </button>
+                    <button type="button" className="button button-secondary" onClick={() => setReportWait(null)}>
+                      {language === "sw" ? "Funga" : "Close"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {activeCategory && (
         <div className="help-sheet-backdrop" onClick={() => setActiveCategoryId(null)}>

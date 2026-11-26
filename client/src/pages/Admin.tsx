@@ -9,7 +9,6 @@ import {
   Inbox,
   LayoutGrid,
   Leaf,
-  Loader2,
   LogOut,
   Pencil,
   Plus,
@@ -48,6 +47,7 @@ import AdminHelpInbox from "@/pages/AdminHelpInbox";
 import AdminContentBank from "@/pages/AdminContentBank";
 import AdminProductImages from "@/components/AdminProductImages";
 import BrandMark from "@/components/BrandMark";
+import ButtonBusyMark from "@/components/ButtonBusyMark";
 
 export type AdminSection = "browse" | "edit" | "screenings" | "help" | "bank";
 
@@ -646,7 +646,7 @@ export default function Admin() {
                   )}
                   <button type="button" className="button button-secondary" disabled={saving} onClick={() => setEditing(null)}>Close</button>
                   <button type="button" className="button button-primary" disabled={saving || !editing.name.trim()} onClick={() => void save()}>
-                    {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
+                    {saving ? <ButtonBusyMark size={17} /> : <Save size={17} />}
                     {saving ? "Saving…" : "Save product"}
                   </button>
                 </div>

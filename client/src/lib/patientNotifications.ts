@@ -18,6 +18,11 @@ function writeSeenIds(ids: Set<string>): void {
   localStorage.setItem(SEEN_IDS_KEY, JSON.stringify([...ids]));
 }
 
+function dispatchResultsSeen(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("ghp:results-seen"));
+}
+
 /** @deprecated Prefer markScreeningSeen — kept for migration of old watermark. */
 export function getResultsLastSeen(): number {
   if (typeof localStorage === "undefined") return 0;
@@ -35,8 +40,23 @@ export function markResultsSeen(now = Date.now()): void {
 export function markScreeningSeen(id: string): void {
   if (!id) return;
   const ids = readSeenIds();
+  if (ids.has(id)) return;
   ids.add(id);
   writeSeenIds(ids);
+  dispatchResultsSeen();
+}
+
+export function markScreeningsSeen(idsToMark: string[]): void {
+  const ids = readSeenIds();
+  let changed = false;
+  for (const id of idsToMark) {
+    if (!id || ids.has(id)) continue;
+    ids.add(id);
+    changed = true;
+  }
+  if (!changed) return;
+  writeSeenIds(ids);
+  dispatchResultsSeen();
 }
 
 export function isScreeningSeen(id: string, stamp = 0): boolean {

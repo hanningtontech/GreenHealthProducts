@@ -1,0 +1,182 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.assistStoreSearchCore = assistStoreSearchCore;
+exports.assertAssistStoreSearchInput = assertAssistStoreSearchInput;
+/**
+ * Patient-safe store search assist (not admin-only).
+ * Gemini may draft wellness wording; product codes must stay in the eligible catalog set.
+ */
+const https_1 = require("firebase-functions/v2/https");
+const generateWellnessReply_1 = require("./generateWellnessReply");
+const SYSTEM_INSTRUCTION = `You help GreenHealthProducts store search.
+Given a short shopper query (product name OR how they feel), return JSON only.
+
+Rules:
+- Recommend product codes ONLY from eligibleCatalogCandidates. Never invent codes.
+- If the query is clearly a product browse (brand/code/ingredient), set mode "products", pick up to 4 matching codes, keep summary short.
+- If the query describes symptoms or feelings, set mode "wellness", write a short summary + nextSteps, pick at most ONE product code when a candidate clearly fits, else null/empty.
+- If red-flag emergency wording, set mode "urgent", empty productCodes, tell them to seek emergency care now.
+- needsConfirm must be true whenever mode is wellness or when you relied on general knowledge beyond bankHints.
+- Do not claim diagnosis or prescription. Plain language only.
+- Return JSON fields: mode, productCodes, summary, nextSteps, needsConfirm.`;
+function extractJsonObject(raw) {
+    const trimmed = raw.trim();
+    const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const body = fence ? fence[1].trim() : trimmed;
+    const start = body.indexOf("{");
+    const end = body.lastIndexOf("}");
+    if (start < 0 || end <= start)
+        throw new Error("No JSON object in model output");
+    return JSON.parse(body.slice(start, end + 1));
+}
+async function callGemini(prompt, apiKey) {
+    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 28000);
+    try {
+        const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    temperature: 0.35,
+                    responseMimeType: "application/json",
+                },
+            }),
+        });
+        if (!res.ok) {
+            const errText = await res.text().catch(() => "");
+            throw new Error(`Gemini HTTP ${res.status}: ${errText.slice(0, 200)}`);
+        }
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+        if (!text.trim())
+            throw new Error("Empty Gemini response");
+        return text;
+    }
+    finally {
+        clearTimeout(timer);
+    }
+}
+function fallback(input) {
+    const q = input.query.toLowerCase();
+    const urgent = /chest pain|can't breathe|cannot breathe|stroke|suicide|unconscious|seizure|bleeding heavily/i.test(q);
+    if (urgent) {
+        return {
+            mode: "urgent",
+            productCodes: [],
+            summary: input.language === "sw"
+                ? "Hii inaweza kuwa dharura. Tafuta huduma ya dharura sasa."
+                : "This may be an emergency. Seek emergency care now.",
+            nextSteps: input.language === "sw"
+                ? "Piga huduma ya dharura au nenda hospitali iliyo karibu."
+                : "Call emergency services or go to the nearest emergency department.",
+            needsConfirm: true,
+            matchedCaseIds: [],
+            source: "fallback",
+        };
+    }
+    const codes = input.catalogCandidates
+        .filter((c) => {
+        const hay = `${c.code} ${c.name} ${c.documentedUse}`.toLowerCase();
+        return q.split(/\s+/).filter((w) => w.length > 2).some((w) => hay.includes(w));
+    })
+        .slice(0, 4)
+        .map((c) => c.code.toUpperCase());
+    if (codes.length) {
+        return {
+            mode: "products",
+            productCodes: codes,
+            summary: input.language === "sw" ? "Bidhaa zinazofanana na utafutaji wako." : "Products that match your search.",
+            nextSteps: "",
+            needsConfirm: false,
+            matchedCaseIds: [],
+            source: "fallback",
+        };
+    }
+    return {
+        mode: "wellness",
+        productCodes: [],
+        summary: input.language === "sw"
+            ? "Tumepokea maelezo yako. Thibitisha ili tuendelee kukusaidia, au tuma kwenye Get help."
+            : "We have your note. Confirm to continue, or send it through Get help.",
+        nextSteps: input.language === "sw"
+            ? "Fungua Get help ili kuweka maelezo yako na akaunti yako."
+            : "Open Get help so we can keep your note with your account.",
+        needsConfirm: true,
+        matchedCaseIds: [],
+        source: "fallback",
+    };
+}
+async function assistStoreSearchCore(input) {
+    const eligible = new Set((input.catalogCandidates || []).map((c) => String(c.code || "").trim().toUpperCase()).filter(Boolean));
+    const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+    if (!apiKey)
+        return fallback(input);
+    const prompt = JSON.stringify({
+        language: input.language,
+        query: (0, generateWellnessReply_1.redactPii)(input.query).slice(0, 800),
+        eligibleCatalogCandidates: (input.catalogCandidates || []).slice(0, 12).map((c) => ({
+            code: String(c.code || "").toUpperCase(),
+            name: String(c.name || "").slice(0, 120),
+            documentedUse: String(c.documentedUse || "").slice(0, 400),
+        })),
+        bankHints: (input.bankHints || []).slice(0, 4).map((h) => ({
+            conditionTitle: String(h.conditionTitle || "").slice(0, 120),
+            guidance: (0, generateWellnessReply_1.redactPii)(String(h.guidance || "")).slice(0, 600),
+        })),
+    });
+    try {
+        const raw = await callGemini(prompt, apiKey);
+        const parsed = extractJsonObject(raw);
+        const modeRaw = String(parsed.mode || "wellness").toLowerCase();
+        const mode = modeRaw === "products" || modeRaw === "urgent" ? modeRaw : "wellness";
+        const codesRaw = Array.isArray(parsed.productCodes)
+            ? parsed.productCodes
+            : parsed.productCode
+                ? [parsed.productCode]
+                : [];
+        const productCodes = codesRaw
+            .map((c) => String(c || "").trim().toUpperCase())
+            .filter((c) => eligible.has(c))
+            .slice(0, mode === "wellness" ? 1 : 4);
+        const needsConfirm = mode !== "products"
+            ? true
+            : Boolean(parsed.needsConfirm);
+        return {
+            mode,
+            productCodes: mode === "urgent" ? [] : productCodes,
+            summary: String(parsed.summary || "").trim().slice(0, 2000)
+                || fallback(input).summary,
+            nextSteps: String(parsed.nextSteps || "").trim().slice(0, 2000),
+            needsConfirm,
+            matchedCaseIds: [],
+            source: "gemini",
+        };
+    }
+    catch (err) {
+        console.warn("assistStoreSearch fallback", err instanceof Error ? err.message : "error");
+        return fallback(input);
+    }
+}
+function assertAssistStoreSearchInput(data) {
+    const d = (data || {});
+    const query = String(d.query || "").trim();
+    if (!query)
+        throw new https_1.HttpsError("invalid-argument", "query required");
+    return {
+        language: d.language === "sw" ? "sw" : "en",
+        query: query.slice(0, 800),
+        catalogCandidates: Array.isArray(d.catalogCandidates)
+            ? d.catalogCandidates.slice(0, 24)
+            : [],
+        bankHints: Array.isArray(d.bankHints)
+            ? d.bankHints.slice(0, 6)
+            : [],
+    };
+}
+//# sourceMappingURL=assistStoreSearch.js.map

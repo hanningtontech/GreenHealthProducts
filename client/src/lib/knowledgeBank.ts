@@ -118,7 +118,7 @@ async function writeKnowledgeCaseToFirestore(input: KnowledgeCase): Promise<void
     stripUndefined({
       ...rest,
       updatedAt: serverTimestamp(),
-      approvedAt: rest.qualityFlag === "green"
+      approvedAt: rest.qualityFlag === "green" || rest.qualityFlag === "diamond"
         ? (rest.approvedAt ?? serverTimestamp())
         : rest.approvedAt,
       createdAt: rest.createdAt ?? serverTimestamp(),
@@ -328,7 +328,7 @@ export async function approveBankCase(input: {
   existingCases: KnowledgeCase[];
   selectedCaseId?: string | null;
   reviewNote?: string;
-  qualityFlag?: "green" | "yellow";
+  qualityFlag?: "diamond" | "green" | "yellow";
 }): Promise<KnowledgeCase> {
   const ids = (input.matchedCaseIds || []).filter(Boolean);
   if (ids.length > 1 && !input.selectedCaseId) {
@@ -339,6 +339,7 @@ export async function approveBankCase(input: {
   const existing = input.existingCases.find((c) => c.id === targetId);
   if (!existing) throw new Error(`Bank entry not found: ${targetId}`);
   const flag = input.qualityFlag || "green";
+  const productionReady = flag === "diamond" || flag === "green";
 
   const next: KnowledgeCase = {
     ...existing,
@@ -355,14 +356,18 @@ export async function approveBankCase(input: {
     summarySw: existing.summarySw,
     recommendations: [...(existing.recommendations || [])],
     qualityFlag: flag,
-    reviewStatus: flag === "green" ? "approved" : (existing.reviewStatus === "quarantined" ? "quarantined" : "needs_review"),
-    active: flag === "green" ? true : existing.active !== false,
-    approvedAt: flag === "green" ? Date.now() : existing.approvedAt,
+    reviewStatus: productionReady
+      ? "approved"
+      : (existing.reviewStatus === "quarantined" ? "quarantined" : "needs_review"),
+    active: productionReady ? true : existing.active !== false,
+    approvedAt: productionReady ? Date.now() : existing.approvedAt,
     reviewedAt: Date.now(),
     reviewNote: input.reviewNote
-      || (flag === "green"
-        ? "Approved in bank testing (metadata only)."
-        : "Marked yellow / unconfirmed (metadata only)."),
+      || (flag === "diamond"
+        ? "Promoted to diamond — eligible for automatic patient replies."
+        : flag === "green"
+          ? "Approved in bank testing (metadata only)."
+          : "Marked yellow / unconfirmed (metadata only)."),
   };
   await saveKnowledgeCase(next);
   return next;
@@ -372,7 +377,7 @@ export async function approveBankCase(input: {
 export function normalizeBankCase(item: KnowledgeCase): KnowledgeCase {
   const reviewStatus: BankReviewStatus =
     item.reviewStatus
-    || (item.qualityFlag === "green" ? "approved"
+    || (item.qualityFlag === "diamond" || item.qualityFlag === "green" ? "approved"
       : item.qualityFlag === "red" ? "needs_review"
         : item.qualityFlag === "yellow" ? "needs_review"
           : "approved");
@@ -384,7 +389,7 @@ export function normalizeBankCase(item: KnowledgeCase): KnowledgeCase {
   };
 }
 
-/** Eligible for patient-facing draft retrieval. */
+/** Eligible for patient-facing draft retrieval (green + diamond). */
 export function isRetrievalEligible(item: KnowledgeCase): boolean {
   const n = normalizeBankCase(item);
   if (n.active === false) return false;
@@ -394,6 +399,12 @@ export function isRetrievalEligible(item: KnowledgeCase): boolean {
   }
   if (n.qualityFlag === "red") return false;
   return n.reviewStatus === "approved";
+}
+
+/** Diamond-only gate for automatic patient replies (no admin share). */
+export function isDiamondEligible(item: KnowledgeCase): boolean {
+  const n = normalizeBankCase(item);
+  return isRetrievalEligible(n) && n.qualityFlag === "diamond" && !n.urgent;
 }
 
 /** Strip common PII patterns before model / logs (client-side helper). */
@@ -544,17 +555,20 @@ export async function learnFromBankTest(input: {
   replySw: string;
   matchedCaseIds: string[];
   existingCases: KnowledgeCase[];
-  qualityFlag: "green" | "yellow" | "red";
+  qualityFlag: "diamond" | "green" | "yellow" | "red";
   recommendations?: ScreeningRecommendation[];
   selectedCaseId?: string | null;
   structured?: BankCorrectionFields;
 }): Promise<KnowledgeCase> {
-  if (input.qualityFlag === "green") {
+  if (input.qualityFlag === "green" || input.qualityFlag === "diamond") {
     return approveBankCase({
       matchedCaseIds: input.matchedCaseIds,
       existingCases: input.existingCases,
       selectedCaseId: input.selectedCaseId,
-      reviewNote: "Approved in bank testing.",
+      qualityFlag: input.qualityFlag,
+      reviewNote: input.qualityFlag === "diamond"
+        ? "Promoted to diamond in bank testing."
+        : "Approved in bank testing.",
     });
   }
 
@@ -717,8 +731,8 @@ export function knowledgeCaseFromGeminiTeach(input: {
   issueSnippet?: string;
 }): KnowledgeCase {
   const conditionTitle = redactPiiForModel(
-    (input.conditionTitle || input.diseases?.[0] || "Gemini wellness guidance").trim(),
-  ).slice(0, 80) || "Gemini wellness guidance";
+    (input.conditionTitle || input.diseases?.[0] || "GHP wellness guidance").trim(),
+  ).slice(0, 80) || "GHP wellness guidance";
   const keywordsEn = [...new Set((input.keywordsEn || []).map((k) => redactPiiForModel(k).trim()).filter(Boolean))].slice(0, 24);
   const keywordsSw = [...new Set((input.keywordsSw || []).map((k) => redactPiiForModel(k).trim()).filter(Boolean))].slice(0, 24);
   const diseases = [...new Set((input.diseases || []).map((d) => redactPiiForModel(d).trim()).filter(Boolean))].slice(0, 12);
@@ -754,7 +768,7 @@ export function knowledgeCaseFromGeminiTeach(input: {
     reviewStatus: "needs_review",
     active: false,
     qualityFlag: "yellow",
-    provenanceNote: `Gemini-taught — awaiting admin approval.${input.issueSnippet ? ` Issue hint: ${redactPiiForModel(input.issueSnippet).slice(0, 120)}` : ""}`,
+    provenanceNote: `GHP draft — awaiting admin approval.${input.issueSnippet ? ` Issue hint: ${redactPiiForModel(input.issueSnippet).slice(0, 120)}` : ""}`,
   };
 }
 
@@ -846,10 +860,11 @@ export function scoreKnowledgeMatch(caseItem: KnowledgeCase, text: string): numb
     if (triggerAppearsNegated(hay, t)) continue;
     score += triggerMatchScore(hay, t, diseaseSet.has(t));
   }
-  // Prefer admin-approved (green) replies; soft-penalize red until corrected.
+  // Prefer diamond, then green; soft-penalize red until corrected.
   if (score > 0) {
     if (caseItem.urgent) score += 20;
-    if (caseItem.qualityFlag === "green" || caseItem.reviewStatus === "approved") score += 4;
+    if (caseItem.qualityFlag === "diamond") score += 8;
+    else if (caseItem.qualityFlag === "green" || caseItem.reviewStatus === "approved") score += 4;
     else if (caseItem.qualityFlag === "yellow") score += 1;
     else if (caseItem.qualityFlag === "red") score -= 2;
   }
@@ -859,17 +874,21 @@ export function scoreKnowledgeMatch(caseItem: KnowledgeCase, text: string): numb
 /**
  * Retrieve approved+active bank references for drafting.
  * Pass `{ forAdminReview: true }` to include non-approved entries (bank test UI).
+ * Pass `{ diamondOnly: true }` for automatic patient replies.
  */
 export function findSimilarCases(
   cases: KnowledgeCase[],
   text: string,
   limit = 5,
-  options?: { forAdminReview?: boolean; minScore?: number },
+  options?: { forAdminReview?: boolean; minScore?: number; diamondOnly?: boolean },
 ): KnowledgeCase[] {
   const minScore = options?.minScore ?? BANK_RETRIEVAL_MIN_SCORE;
-  const pool = options?.forAdminReview
+  let pool = options?.forAdminReview
     ? cases
     : cases.filter(isRetrievalEligible);
+  if (options?.diamondOnly) {
+    pool = pool.filter(isDiamondEligible);
+  }
   return pool
     .map((item) => ({ item: normalizeBankCase(item), score: scoreKnowledgeMatch(item, text) }))
     .filter((row) => row.score >= minScore)

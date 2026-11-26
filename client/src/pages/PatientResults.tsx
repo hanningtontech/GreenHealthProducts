@@ -1,31 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
-import { FileText, ShieldCheck } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import BrandMark from "@/components/BrandMark";
+import SiteNavActions from "@/components/SiteNavActions";
 import { findPatientByAuthUid } from "@/lib/patients";
 import { getScreening, subscribeSharedScreeningsForPatient } from "@/lib/screenings";
 import { buildPatientReport } from "@/lib/buildPatientReport";
 import { downloadPatientReportPdf } from "@/lib/printPatientReport";
 import { isHttpUrl } from "@/lib/mediaStorage";
-import { initialsFromName } from "@/lib/patientAvatar";
 import { isScreeningSeen, markScreeningSeen, screeningStamp } from "@/lib/patientNotifications";
+import { patientFacingReportTitle } from "@/lib/patientReportTitle";
 import { BUSINESS_CONTACT } from "@/lib/reportCopy";
 import type { Screening } from "@/lib/screeningTypes";
-import { WELLNESS_DISCLAIMER } from "@/lib/screeningTypes";
 
 function ReportWebView({ screening }: { screening: Screening }) {
   const report = useMemo(() => buildPatientReport(screening), [screening]);
+  const headline = report.headline || patientFacingReportTitle(screening);
   return (
     <article className="patient-report-web">
       <header className="patient-report-head">
         <div className="patient-report-identity">
-          <span className="patient-avatar-circle" style={{ width: 56, height: 56, fontSize: 18 }}>
-            {initialsFromName(screening.subject.name || "Patient")}
-          </span>
           <div>
             <p className="eyebrow">{report.title}</p>
-            <h2>{screening.subject.name}</h2>
+            <h2>{headline}</h2>
             <small>
               {screening.subject.testDate || "—"}
               {screening.subject.age != null && screening.subject.age !== "" ? ` · age ${screening.subject.age}` : ""}
@@ -67,12 +65,21 @@ function ReportWebView({ screening }: { screening: Screening }) {
       <section>
         <h3>What this means</h3>
         <p className="patient-report-body">{report.simpleConclusion}</p>
+        {report.fullConclusion ? (
+          <details className="patient-report-body" style={{ marginTop: 12 }}>
+            <summary>Full details</summary>
+            <p style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{report.fullConclusion}</p>
+          </details>
+        ) : null}
         {report.simpleConclusionSw && (
           <div className="patient-report-sw">
             <b>{report.swLabel}</b>
             <p>{report.simpleConclusionSw}</p>
           </div>
         )}
+        {report.fullConclusionSw ? (
+          <p className="muted" style={{ marginTop: 8, fontSize: 13, whiteSpace: "pre-wrap" }}>{report.fullConclusionSw}</p>
+        ) : null}
       </section>
 
       {report.weekActions.length > 0 && (
@@ -116,7 +123,7 @@ function ReportWebView({ screening }: { screening: Screening }) {
                 </div>
                 <small>{line.packSize} · {line.unitPriceLabel} × {line.qty}</small>
                 {(line.concern || line.role) && <p>{line.concern}{line.role ? ` — ${line.role}` : ""}</p>}
-                <p><span className="eyebrow">How to use</span>{line.usage}</p>
+                <p style={{ marginTop: 12 }}><span className="eyebrow">How to use</span> {line.usage}</p>
                 <p><span className="eyebrow">Cautions</span>{line.warnings}</p>
               </div>
             ))}
@@ -147,7 +154,6 @@ function ReportWebView({ screening }: { screening: Screening }) {
         </div>
       </section>
 
-      <div className="notice"><ShieldCheck size={17} /><span>{WELLNESS_DISCLAIMER}</span></div>
     </article>
   );
 }
@@ -179,7 +185,8 @@ export default function PatientResults() {
           }
         } else {
           unsub = subscribeSharedScreeningsForPatient(patient.id, (list) => {
-            if (!cancelled) setScreenings(list);
+            if (cancelled) return;
+            setScreenings(list);
           });
         }
       } catch (err) {
@@ -199,6 +206,15 @@ export default function PatientResults() {
   if (!user) {
     return (
       <div className="admin-shell">
+        <header className="admin-header profile-header">
+          <div className="admin-header-bar">
+            <div>
+              <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
+              <p className="admin-kicker">My results</p>
+            </div>
+            <SiteNavActions variant="patient" />
+          </div>
+        </header>
         <main className="container admin-main">
           <section className="auth-panel">
             <h1>My results</h1>
@@ -212,14 +228,20 @@ export default function PatientResults() {
 
   return (
     <div className="admin-shell">
-      <header className="admin-header">
-        <div>
-          <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
-          <p className="admin-kicker">My results</p>
-        </div>
-        <div className="admin-header-actions">
-          <Link href="/help" className="button button-secondary">Get help</Link>
-          <Link href="/" className="button button-secondary">Store</Link>
+      <header className="admin-header profile-header">
+        <div className="admin-header-bar">
+          <div>
+            <Link href="/" className="brand"><BrandMark /><span>GreenHealth<em>Products</em></span></Link>
+            <p className="admin-kicker">My results</p>
+          </div>
+          <SiteNavActions
+            variant="patient"
+            menuItems={[
+              { href: "/", label: "Store", icon: "store" },
+              { href: "/help", label: "Get help", icon: "help" },
+              { href: "/profile", label: "My profile", icon: "profile" },
+            ]}
+          />
         </div>
       </header>
       <main className="container admin-main">
@@ -237,16 +259,17 @@ export default function PatientResults() {
               <div className="patient-results-list">
                 {screenings.map((item) => {
                   const unseen = !isScreeningSeen(item.id, screeningStamp(item));
+                  const headline = patientFacingReportTitle(item);
                   return (
                     <Link
                       key={item.id}
                       href={`/results/${item.id}`}
                       className={`patient-result-card ${unseen ? "is-unread" : ""}`}
                     >
-                      <span className="patient-avatar-circle">{initialsFromName(item.subject.name || "Patient")}</span>
+                      <span className="patient-avatar-circle" aria-hidden>{headline.slice(0, 1).toUpperCase() || "R"}</span>
                       <div>
-                        <b>{item.subject.name || "Report"}</b>
-                        <small>{item.subject.testDate || item.id}{item.sourceIntakeId ? " · from your help note" : ""}</small>
+                        <b>{headline}</b>
+                        <small>{item.subject.testDate || "Shared"}{item.sourceIntakeId ? " · from your help note" : ""}</small>
                       </div>
                       {unseen ? <span className="nav-badge" style={{ position: "static" }}>new</span> : <span className="status status-good">shared</span>}
                     </Link>

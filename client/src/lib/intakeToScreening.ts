@@ -150,14 +150,33 @@ function buildConclusion(intake: Intake): { en: string; sw: string } {
 }
 
 export async function ensurePatientForIntake(intake: Intake): Promise<Patient> {
+  let profileAge = "";
+  let profileSex = "";
+  let profilePhone = "";
+  let profilePhoto = "";
+  let profileName = "";
   if (intake.authUid) {
+    try {
+      const { fetchProfile } = await import("./auth");
+      const profile = await fetchProfile(intake.authUid);
+      profileAge = String(profile?.age || "").trim();
+      profileSex = String(profile?.sex || "").trim();
+      profilePhone = String(profile?.phone || "").trim();
+      profilePhoto = String(profile?.photoUrl || "").trim();
+      profileName = String(profile?.displayName || "").trim();
+    } catch {
+      // continue with intake fields
+    }
     const existing = await findPatientByAuthUid(intake.authUid);
     if (existing) {
       return upsertPatient({
         ...existing,
-        displayName: intake.displayName || existing.displayName,
+        displayName: profileName || intake.displayName || existing.displayName,
         email: (intake.email || existing.email || "").toLowerCase(),
-        phone: existing.phone,
+        phone: profilePhone || existing.phone,
+        age: profileAge || existing.age,
+        sex: profileSex || existing.sex,
+        photoUrl: profilePhoto || existing.photoUrl,
       });
     }
   }
@@ -165,7 +184,11 @@ export async function ensurePatientForIntake(intake: Intake): Promise<Patient> {
     id: intake.patientId,
     authUid: intake.authUid,
     email: (intake.email || `help-${intake.id}@greenhealthproducts.local`).toLowerCase(),
-    displayName: intake.displayName || "Patient",
+    displayName: profileName || intake.displayName || "Patient",
+    age: profileAge,
+    sex: profileSex,
+    phone: profilePhone,
+    photoUrl: profilePhoto,
   });
 }
 
@@ -205,6 +228,7 @@ export async function ensureScreeningDraftFromIntake(intake: Intake): Promise<Sc
       phone: patient.phone || "",
       sex: patient.sex || "",
       age: patient.age ?? "",
+      photoUrl: patient.photoUrl || "",
       testDate: todayLabel(),
     },
     groups,

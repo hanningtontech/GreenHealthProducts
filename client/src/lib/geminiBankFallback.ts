@@ -163,9 +163,7 @@ async function callGeminiForIssue(opts: {
       nextSteps: opts.language === "sw"
         ? "Tafuta huduma ya dharura sasa."
         : "Seek emergency care now.",
-      precautions: opts.language === "sw"
-        ? "Hii si utambuzi."
-        : "This is not a diagnosis.",
+      precautions: "",
       urgency: "urgent",
       followUpQuestion: null,
       productCode: null,
@@ -213,7 +211,7 @@ export async function resolveScreeningDraftWithGeminiFallback(
       recommendations: bankDraft.recommendations,
       matchedCaseIds: bankDraft.matchedCaseIds,
       weekActions: bankDraft.weekActions,
-      message: `Matched ${bankDraft.matchedCaseIds.length} bank case(s).`,
+      message: `Matched ${bankDraft.matchedCaseIds.length} guidance case(s).`,
     };
   }
 
@@ -229,7 +227,7 @@ export async function resolveScreeningDraftWithGeminiFallback(
       recommendations: [],
       matchedCaseIds: [],
       weekActions: bankDraft.weekActions,
-      message: "Urgent care guidance — Gemini skipped.",
+      message: "Urgent care guidance ready for review.",
     };
   }
 
@@ -249,7 +247,7 @@ export async function resolveScreeningDraftWithGeminiFallback(
       recommendations: bankDraft.recommendations,
       matchedCaseIds: [],
       weekActions: bankDraft.weekActions,
-      message: "No bank match — Gemini unavailable (check GEMINI_API_KEY on Cloud Functions).",
+      message: "No saved match yet — guidance could not be prepared. Try again or write a draft.",
       reply: null,
     };
   }
@@ -283,8 +281,8 @@ export async function resolveScreeningDraftWithGeminiFallback(
     weekActions: bankDraft.weekActions,
     taughtCase,
     message: reply.source === "gemini"
-      ? `No bank match — Gemini draft applied${taughtCase ? `; saved “${taughtCase.title}” as needs review` : ""}.`
-      : "No bank match — safe fallback (Gemini key missing or call failed).",
+      ? `Draft ready${taughtCase ? ` — saved “${taughtCase.title}” for review` : ""}. Green-approve before relying on it.`
+      : "No saved match yet — showing a safe general draft.",
     reply,
   };
 }
@@ -305,8 +303,8 @@ export async function resolveIntakeTestWithGeminiFallback(
       matchedCaseIds: bankDraft.matchedCaseIds,
       weekActions: [],
       message: bankDraft.urgent
-        ? "Urgent combination matched — Gemini skipped."
-        : `Matched ${bankDraft.matchedCaseIds.length} bank case(s).`,
+        ? "Urgent combination matched — immediate action shown."
+        : `Matched ${bankDraft.matchedCaseIds.length} guidance case(s).`,
       replyText: bankDraft.reply,
       replySw: bankDraft.replySw,
       productLines: bankDraft.productLines || [],
@@ -322,7 +320,7 @@ export async function resolveIntakeTestWithGeminiFallback(
       recommendations: [],
       matchedCaseIds: [],
       weekActions: [],
-      message: "Urgent care guidance — Gemini skipped.",
+      message: "Urgent care guidance ready for review.",
       replyText: bankDraft.reply,
       replySw: bankDraft.replySw,
       productLines: [],
@@ -346,7 +344,7 @@ export async function resolveIntakeTestWithGeminiFallback(
       recommendations: bankDraft.recommendations,
       matchedCaseIds: [],
       weekActions: [],
-      message: "No bank match — Gemini unavailable (check GEMINI_API_KEY on Cloud Functions).",
+      message: "No saved match yet — guidance could not be prepared. Try again or write a draft.",
       replyText: bankDraft.reply,
       replySw: bankDraft.replySw,
       productLines: bankDraft.productLines || [],
@@ -377,8 +375,8 @@ export async function resolveIntakeTestWithGeminiFallback(
     weekActions: [],
     taughtCase,
     message: reply.source === "gemini"
-      ? `No bank match — Gemini draft applied${taughtCase ? `; saved “${taughtCase.title}” as needs review` : ""}. Green-approve before retrieval.`
-      : "No bank match — safe fallback (Gemini key missing or call failed).",
+      ? `Draft ready${taughtCase ? ` — saved “${taughtCase.title}” for review` : ""}. Green-approve before relying on it.`
+      : "No saved match yet — showing a safe general draft.",
     reply,
     replyText,
     replySw,

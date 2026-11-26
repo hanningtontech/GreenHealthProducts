@@ -9,6 +9,7 @@ import {
   listKnowledgeCases,
   mergeRecommendations,
 } from "./knowledgeBank";
+import { isDisclaimerClosing, isMetaReplyOpening } from "./reportCopy";
 import { ensureSwahiliSummary } from "./translateToSw";
 import type {
   BankProductDisplay,
@@ -122,7 +123,8 @@ export function assembleStructuredReply(cases: KnowledgeCase[], personName = "yo
   }
 
   const primary = cases[0];
-  const opening = (primary.replyOpening || "Thank you for sharing.").trim()
+  const rawOpening = (primary.replyOpening || "Thank you for sharing.").trim();
+  const opening = (isMetaReplyOpening(rawOpening) ? "Thank you for sharing." : rawOpening)
     .replace(/\bthe person\b/gi, personName === "you" ? "you" : personName);
   const concernParts = cases.map((c) => {
     const body = (c.replyConcerns || c.summary || "").trim();
@@ -132,9 +134,10 @@ export function assembleStructuredReply(cases: KnowledgeCase[], personName = "yo
   }).filter(Boolean);
   const concerns = concernParts.join("\n\n");
   const productIntro = (primary.replyRecommendationsIntro || "").trim();
-  const closing = (primary.replyClosing || "").trim();
+  const rawClosing = (primary.replyClosing || "").trim();
+  const closing = isDisclaimerClosing(rawClosing) ? "" : rawClosing;
 
-  const reply = [opening, concerns, productIntro, closing].filter(Boolean).join("\n\n");
+  const reply = [opening, concerns, closing].filter(Boolean).join("\n\n");
   return { reply, opening, concerns, productIntro, closing };
 }
 
@@ -172,9 +175,6 @@ export function assembleIntakeReply(input: {
   const replyParts = [
     structured.opening,
     structured.concerns,
-    resolved.productLines.length
-      ? [structured.productIntro || "Product option:", ...resolved.productLines.map((l) => `• ${l}`)].join("\n")
-      : "",
     structured.closing,
   ].filter(Boolean);
 
@@ -277,19 +277,13 @@ export async function draftFromContentBank(screening: Screening): Promise<{
 
   const personLabel = "you";
   const structured = assembleStructuredReply(used, personLabel);
-  const withProducts = resolved.productLines.length
-    ? [
-      structured.reply,
-      ["Product option:", ...resolved.productLines.map((l) => `• ${l}`)].join("\n"),
-    ].filter(Boolean).join("\n\n")
-    : structured.reply;
 
   const noMatchEn =
     "Thank you for sharing. Your note has been received — our team will review it and share a wellness plan when ready.";
   const noMatchSw =
     "Asante kwa kushiriki. Maelezo yako yamepokelewa — tutayapitia na kukushirikisha mpango wa afya utakapokuwa tayari.";
 
-  const conclusion = used.length ? withProducts : noMatchEn;
+  const conclusion = used.length ? structured.reply : noMatchEn;
   const swBodies = used
     .map((c) => c.summarySw || c.replyConcerns || c.summary)
     .filter(Boolean)

@@ -24,6 +24,8 @@ export type ScreeningSubject = {
   testDate?: string;
   testTime?: string;
   phone?: string;
+  /** Public profile photo URL (B2 / HTTPS) for PDF + wizard. */
+  photoUrl?: string;
 };
 
 export type ScreeningRecommendation = {
@@ -67,6 +69,8 @@ export type Screening = {
   reportPdfKey?: string;
   /** When the draft was created from a patient /help submission. */
   sourceIntakeId?: string;
+  /** Short patient-facing report heading (issue summary — not the person's name). */
+  patientReportTitle?: string;
   subject: ScreeningSubject;
   groups: ScreeningGroup[];
   simpleConclusion: string;
@@ -103,6 +107,8 @@ export type Patient = {
   phone?: string;
   sex?: string;
   age?: number | string;
+  /** Mirrored from user profile for reports / wizard. */
+  photoUrl?: string;
   notes?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
@@ -171,14 +177,17 @@ export type KnowledgeCase = {
   sourceIntakeId?: string;
   /**
    * Admin quality mark from bank testing:
-   * green = approved reply pattern, yellow = usable but unconfirmed / ready for review, red = needs rewrite.
+   * diamond = auto-reply allowlist (above green),
+   * green = approved reply pattern (admin-assisted),
+   * yellow = usable but unconfirmed / ready for review,
+   * red = needs rewrite.
    */
-  qualityFlag?: "green" | "yellow" | "red";
+  qualityFlag?: "diamond" | "green" | "yellow" | "red";
   /** Explicit retrieval gate — only `approved` + active entries are used for patient drafts. */
   reviewStatus?: BankReviewStatus;
   /** When false, excluded from retrieval (defaults true for legacy docs). */
   active?: boolean;
-  /** When qualityFlag became green (approval metadata only). */
+  /** When qualityFlag became green/diamond (approval metadata only). */
   approvedAt?: unknown;
   /** Last bank-test review note (approval / correction). */
   reviewNote?: string;
@@ -186,6 +195,16 @@ export type KnowledgeCase = {
   reviewedAt?: unknown;
   /** Entry is urgent-care priority (suppress routine products when it matches). */
   urgent?: boolean;
+  /** Successful diamond auto-reply hits (promotion signal; admin still confirms diamond). */
+  autoHitCount?: number;
+  /** Suggested trigger/keyword enrichments awaiting admin review (green learning toward diamond). */
+  pendingEnrich?: {
+    triggersEn?: string[];
+    triggersSw?: string[];
+    keywords?: string[];
+    note?: string;
+    updatedAt?: unknown;
+  };
   /** Admin-only provenance (never sent to models or patients). */
   provenanceNote?: string;
   /** Why this entry intentionally has no product recommendation. */
@@ -264,6 +283,3 @@ export const COMMON_CONCERNS_SW = [
   "Ngozi au nywele",
   "Nyingine",
 ] as const;
-
-export const WELLNESS_DISCLAIMER =
-  "This screening and advice are for wellness information only. They are not a medical diagnosis or treatment. Follow current package labels. For serious or urgent symptoms, see a qualified health professional.";

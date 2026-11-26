@@ -67,9 +67,7 @@ function fallbackReply(input) {
             nextSteps: input.language === "sw"
                 ? "Tafuta huduma ya dharura sasa. Usianze virutubisho vipya."
                 : "Seek emergency or urgent care now. Do not start new supplements.",
-            precautions: input.language === "sw"
-                ? "Hii si utambuzi. Fuata maelekezo ya dharura."
-                : "This is not a diagnosis. Follow emergency guidance first.",
+            precautions: "",
             urgency: "urgent",
             followUpQuestion: null,
             productCode: null,
@@ -92,9 +90,7 @@ function fallbackReply(input) {
         nextSteps: input.language === "sw"
             ? "Subiri ukaguzi wa timu au toa maelezo zaidi yanapohitajika."
             : "Wait for team review, or add a focused detail if asked.",
-        precautions: input.language === "sw"
-            ? "Hii ni taarifa ya ustawi, si utambuzi wala dawa."
-            : "This is wellness information only — not a diagnosis or treatment.",
+        precautions: "",
         urgency: "routine",
         followUpQuestion: hasRefs
             ? null
@@ -154,9 +150,7 @@ function validateAndNormalize(parsed, input) {
         language,
         summary: summary.slice(0, 2000),
         nextSteps: nextSteps.slice(0, 2000),
-        precautions: (precautions || (language === "sw"
-            ? "Hii ni taarifa ya ustawi, si utambuzi."
-            : "This is wellness information only — not a diagnosis.")).slice(0, 2000),
+        precautions: precautions.slice(0, 2000),
         urgency: input.urgency ? "urgent" : urgency,
         followUpQuestion: parsed.followUpQuestion == null || parsed.followUpQuestion === ""
             ? null

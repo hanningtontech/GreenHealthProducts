@@ -5,6 +5,7 @@
  */
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getFirebaseApp, isFirebaseConfigured } from "./firebase";
+import { CLIENT_RATE, allowDebounced, takeClientRateLimit } from "./clientRateLimit";
 
 const FUNCTIONS_REGION = "us-central1";
 const MAX_CHUNK = 4500;
@@ -46,6 +47,10 @@ function chunkText(text: string, size = MAX_CHUNK): string[] {
 
 async function translateViaCloudFunction(text: string): Promise<string> {
   if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
+  if (!allowDebounced("translate_cf", 800)) throw new Error("Translation busy");
+  if (!takeClientRateLimit(CLIENT_RATE.callable.key, CLIENT_RATE.callable.limit, CLIENT_RATE.callable.windowMs).allowed) {
+    throw new Error("Translation rate limited");
+  }
   const fn = httpsCallable(getFunctions(getFirebaseApp(), FUNCTIONS_REGION), "translateToSwahili");
   const result = await fn({ text });
   const data = result.data as { text?: string };

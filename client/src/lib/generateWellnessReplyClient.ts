@@ -1,5 +1,6 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getFirebaseApp, isFirebaseConfigured } from "./firebase";
+import { CLIENT_RATE, allowDebounced, takeClientRateLimit } from "./clientRateLimit";
 import type { WellnessReplyStructured } from "./screeningTypes";
 
 const FUNCTIONS_REGION = "us-central1";
@@ -38,6 +39,14 @@ export async function callGenerateWellnessReply(
   input: GenerateWellnessReplyRequest,
 ): Promise<GenerateWellnessReplyResponse | null> {
   if (!isFirebaseConfigured()) return null;
+  if (!allowDebounced(CLIENT_RATE.aiAdmin.key, CLIENT_RATE.aiAdmin.debounceMs)) return null;
+  if (!takeClientRateLimit(CLIENT_RATE.aiAdmin.key, CLIENT_RATE.aiAdmin.limit, CLIENT_RATE.aiAdmin.windowMs).allowed) {
+    console.warn("generateWellnessReply skipped: client AI rate limit");
+    return null;
+  }
+  if (!takeClientRateLimit(CLIENT_RATE.callable.key, CLIENT_RATE.callable.limit, CLIENT_RATE.callable.windowMs).allowed) {
+    return null;
+  }
   try {
     const fn = httpsCallable(getFunctions(getFirebaseApp(), FUNCTIONS_REGION), "generateWellnessReply");
     const result = await fn(input);
@@ -52,12 +61,14 @@ export async function callGenerateWellnessReply(
 
 /** Map structured reply into the plain-text conclusion fields used by Wizard / PDF. */
 export function formatStructuredConclusion(reply: WellnessReplyStructured, productLine?: string): string {
+  const precautions = reply.precautions?.trim() || "";
+  const skipPrecautions = /wellness information only|not a diagnosis|taarifa ya ustawi/i.test(precautions);
+  void productLine;
   const parts = [
     reply.summary?.trim(),
     reply.nextSteps?.trim() ? `Next steps:\n${reply.nextSteps.trim()}` : "",
-    reply.precautions?.trim() ? `Precautions:\n${reply.precautions.trim()}` : "",
+    precautions && !skipPrecautions ? `Precautions:\n${precautions}` : "",
     reply.followUpQuestion?.trim() ? `Follow-up:\n${reply.followUpQuestion.trim()}` : "",
-    productLine?.trim() ? `Product option:\n• ${productLine.trim()}` : "",
   ].filter(Boolean);
   return parts.join("\n\n");
 }

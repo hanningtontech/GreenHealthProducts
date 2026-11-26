@@ -89,6 +89,7 @@ export async function upsertPatient(input: Omit<Patient, "id" | "createdAt" | "u
     phone: input.phone?.trim() || existing?.phone || byEmail?.phone || "",
     sex: input.sex || existing?.sex || byEmail?.sex || "",
     age: input.age ?? existing?.age ?? byEmail?.age ?? "",
+    photoUrl: input.photoUrl || existing?.photoUrl || byEmail?.photoUrl || "",
     notes: input.notes || existing?.notes || byEmail?.notes || "",
     authUid,
     updatedAt: serverTimestamp(),
